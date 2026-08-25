@@ -1,0 +1,54 @@
+[app]
+state_path = "var/state.json"
+output_path = "var/latest.png"
+log_level = "INFO"
+
+[qweather]
+# 在和风天气控制台“设置”中查看专属 API Host，不要使用即将停用的公共域名。
+api_host = "your-host.qweatherapi.com"
+project_id = "YOUR_PROJECT_ID"
+credential_id = "YOUR_CREDENTIAL_ID"
+private_key_path = "secrets/ed25519-private.pem"
+longitude = 116.41
+latitude = 39.92
+language = "zh"
+timeout_seconds = 15
+retry_attempts = 3
+
+[ble]
+enabled = false
+# Linux 上优先填写稳定的设备地址；也可只填固件广播名称。
+address = ""
+name = ""
+connect_timeout_seconds = 20
+retry_attempts = 3
+write_ack_interval = 20
+
+[gotify]
+enabled = false
+base_url = "https://push.example.com"
+token = ""
+priority = 7
+timeout_seconds = 10
+cooldown_minutes = 360
+
+[schedule]
+# API 每 10 分钟轮询；墨水屏只按下列节奏或遇到重要变化时刷新。
+poll_minutes = 10
+morning_minutes = 30
+daytime_minutes = 60
+evening_minutes = 30
+overnight_minutes = 120
+
+[rules]
+rain_threshold_mm = 0.01
+high_temperature_c = 35
+cold_temperature_c = 5
+temperature_gap_c = 10
+significant_temperature_change_c = 2
+hourly_rain_probability = 50
+
+[render]
+width = 400
+height = 300
+font_path = "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"

@@ -1,0 +1,25 @@
+[Unit]
+Description=WeatherTag e-paper weather display
+Documentation=https://github.com/tsl0922/EPD-nRF5
+Wants=bluetooth.target network-online.target
+After=bluetooth.target network-online.target
+
+[Service]
+Type=simple
+User=weathertag
+Group=weathertag
+WorkingDirectory=/opt/weathertag
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/weathertag/.venv/bin/weathertag serve --config /etc/weathertag/config.toml
+Restart=on-failure
+RestartSec=15s
+StateDirectory=weathertag
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/weathertag
+
+[Install]
+WantedBy=multi-user.target
