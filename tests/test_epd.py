@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import AsyncMock, patch
 
 from PIL import Image
 
@@ -8,6 +9,7 @@ from weathertag.config import BleConfig
 from weathertag.epd import (
     BleEPDDisplay,
     TransferCapabilities,
+    describe_ble_error,
     encode_three_color,
     rle_compress,
     rle_compress_chunks,
@@ -48,8 +50,28 @@ class EPDEncodingTest(unittest.TestCase):
         self.assertTrue(all(len(chunk) <= 18 for chunk in chunks))
         self.assertEqual(b"".join(decompress(chunk) for chunk in chunks), raw)
 
+    def test_empty_timeout_message_becomes_actionable(self) -> None:
+        message = describe_ble_error(TimeoutError(), 20)
+        self.assertIn("TimeoutError", message)
+        self.assertIn("20 秒", message)
+        self.assertIn("天线", message)
+
 
 class EPDProtocolTest(unittest.IsolatedAsyncioTestCase):
+    async def test_refresh_keeps_connection_alive_for_physical_refresh(self) -> None:
+        writer = AsyncMock()
+        display = BleEPDDisplay(BleConfig(refresh_wait_seconds=25))
+
+        with patch("weathertag.epd.asyncio.sleep", new_callable=AsyncMock) as sleep:
+            await display._refresh_and_wait(writer)
+
+        writer.assert_awaited_once_with(
+            "62750002-d828-918d-fb46-b6c11c675aec",
+            b"\x05",
+            response=True,
+        )
+        sleep.assert_awaited_once_with(25)
+
     async def test_image_command_flags_and_ack_interleave(self) -> None:
         writes = []
 

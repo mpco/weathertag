@@ -44,16 +44,23 @@ class BleEPDDisplay:
     async def send_image(self, image: Image.Image) -> None:
         black, red = encode_three_color(image)
         last_error: Exception | None = None
+        last_reason = "未知错误"
         for attempt in range(1, self.config.retry_attempts + 1):
             try:
                 await self._send_planes(black, red)
                 return
             except Exception as exc:  # Bleak backend errors vary by platform.
                 last_error = exc
-                LOGGER.warning("BLE 更新第 %d/%d 次失败: %s", attempt, self.config.retry_attempts, exc)
+                last_reason = describe_ble_error(exc, self.config.connect_timeout_seconds)
+                LOGGER.warning(
+                    "BLE 更新第 %d/%d 次失败: %s",
+                    attempt,
+                    self.config.retry_attempts,
+                    last_reason,
+                )
                 if attempt < self.config.retry_attempts:
                     await asyncio.sleep(min(2 ** (attempt - 1), 4))
-        raise EPDConnectionError(f"BLE 更新连续失败: {last_error}") from last_error
+        raise EPDConnectionError(f"BLE 更新连续失败: {last_reason}") from last_error
 
     async def _send_planes(self, black: bytes, red: bytes) -> None:
         try:
@@ -112,7 +119,16 @@ class BleEPDDisplay:
 
             await self._write_plane(client.write_gatt_char, black, black_plane=True, capabilities=transfer)
             await self._write_plane(client.write_gatt_char, red, black_plane=False, capabilities=transfer)
-            await client.write_gatt_char(IMAGE_CHARACTERISTIC_UUID, bytes((CMD_REFRESH,)), response=True)
+            await self._refresh_and_wait(client.write_gatt_char)
+
+    async def _refresh_and_wait(self, writer: Callable[..., Awaitable[None]]) -> None:
+        await writer(IMAGE_CHARACTERISTIC_UUID, bytes((CMD_REFRESH,)), response=True)
+        if self.config.refresh_wait_seconds > 0:
+            LOGGER.info(
+                "刷新命令已发送，保持 BLE 连接 %.1f 秒等待屏幕完成物理刷新",
+                self.config.refresh_wait_seconds,
+            )
+            await asyncio.sleep(self.config.refresh_wait_seconds)
 
     async def _write_plane(
         self,
@@ -142,6 +158,17 @@ class BleEPDDisplay:
 class TransferCapabilities:
     max_write_length: int = 20
     rle: bool = False
+
+
+def describe_ble_error(error: Exception, timeout_seconds: float) -> str:
+    if isinstance(error, TimeoutError):
+        return (
+            f"TimeoutError: BLE 操作在 {timeout_seconds:g} 秒内未完成"
+            "（若堆栈位于 connect()，请检查天线、距离、设备占用和唤醒状态）"
+        )
+    detail = str(error).strip()
+    name = type(error).__name__
+    return f"{name}: {detail}" if detail else name
 
 
 def encode_three_color(image: Image.Image) -> tuple[bytes, bytes]:

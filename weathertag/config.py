@@ -36,6 +36,7 @@ class BleConfig:
     connect_timeout_seconds: float = 20.0
     retry_attempts: int = 3
     write_ack_interval: int = 20
+    refresh_wait_seconds: float = 25.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,6 +115,8 @@ class AppConfig:
             errors.append("当前硬件仅支持 render.width=400、render.height=300")
         if self.ble.enabled and not (self.ble.address or self.ble.name):
             errors.append("启用 BLE 时必须配置 ble.address 或 ble.name")
+        if self.ble.refresh_wait_seconds < 0:
+            errors.append("ble.refresh_wait_seconds 不能小于 0")
         if self.gotify.enabled and not (self.gotify.base_url and self.gotify.token):
             errors.append("启用 Gotify 时必须配置 gotify.base_url 和 gotify.token")
         if self.schedule.poll_minutes < 1:
@@ -166,6 +169,7 @@ def load_config(path: str | Path, environ: Mapping[str, str] | None = None) -> A
             connect_timeout_seconds=float(ble.get("connect_timeout_seconds", 20)),
             retry_attempts=int(ble.get("retry_attempts", 3)),
             write_ack_interval=int(ble.get("write_ack_interval", 20)),
+            refresh_wait_seconds=float(ble.get("refresh_wait_seconds", 25)),
         ),
         gotify=GotifyConfig(
             enabled=_as_bool(_env(env, "WEATHERTAG_GOTIFY_ENABLED", gotify.get("enabled", False))),

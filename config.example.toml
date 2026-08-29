@@ -23,6 +23,8 @@ name = ""
 connect_timeout_seconds = 20
 retry_attempts = 3
 write_ack_interval = 20
+# GATT 确认只表示刷新命令已接收；保持连接直到三色屏完成物理刷新。
+refresh_wait_seconds = 25
 
 [gotify]
 enabled = false

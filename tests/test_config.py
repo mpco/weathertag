@@ -23,6 +23,7 @@ longitude = 116.41
 latitude = 39.92
 [ble]
 enabled = false
+refresh_wait_seconds = 30
 """,
                 encoding="utf-8",
             )
@@ -30,6 +31,7 @@ enabled = false
             self.assertEqual(config.qweather.api_host, "example.qweatherapi.com")
             self.assertEqual(config.qweather.private_key_path, root / "secret.pem")
             self.assertTrue(config.ble.enabled)
+            self.assertEqual(config.ble.refresh_wait_seconds, 30)
             config.validate()
 
     def test_ble_identity_is_required_when_enabled(self) -> None:
@@ -38,6 +40,14 @@ enabled = false
             path.write_text("[ble]\nenabled=true\n", encoding="utf-8")
             config = load_config(path)
             with self.assertRaises(ConfigError):
+                config.validate(require_weather=False)
+
+    def test_negative_refresh_wait_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "invalid.toml"
+            path.write_text("[ble]\nrefresh_wait_seconds=-1\n", encoding="utf-8")
+            config = load_config(path)
+            with self.assertRaisesRegex(ConfigError, "refresh_wait_seconds"):
                 config.validate(require_weather=False)
 
 
