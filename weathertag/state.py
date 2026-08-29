@@ -27,6 +27,7 @@ class StateStore:
             else None,
             last_screen_update=_optional_datetime(raw.get("last_screen_update")),
             last_failure_screen=_optional_datetime(raw.get("last_failure_screen")),
+            battery_millivolts=_optional_int(raw.get("battery_millivolts")),
             notification_times={
                 key: datetime.fromisoformat(value) for key, value in raw.get("notification_times", {}).items()
             },
@@ -38,6 +39,7 @@ class StateStore:
             "last_snapshot": state.last_snapshot.to_dict() if state.last_snapshot else None,
             "last_screen_update": _encode_datetime(state.last_screen_update),
             "last_failure_screen": _encode_datetime(state.last_failure_screen),
+            "battery_millivolts": state.battery_millivolts,
             "notification_times": {
                 key: value.isoformat() for key, value in state.notification_times.items()
             },
@@ -53,3 +55,12 @@ def _optional_datetime(value: str | None) -> datetime | None:
 
 def _encode_datetime(value: datetime | None) -> str | None:
     return value.isoformat() if value else None
+
+
+def _optional_int(value: object) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None

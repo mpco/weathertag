@@ -13,6 +13,7 @@ from weathertag.epd import (
     encode_three_color,
     rle_compress,
     rle_compress_chunks,
+    update_transfer_status,
 )
 
 
@@ -55,6 +56,15 @@ class EPDEncodingTest(unittest.TestCase):
         self.assertIn("TimeoutError", message)
         self.assertIn("20 秒", message)
         self.assertIn("天线", message)
+
+    def test_device_notifications_capture_mtu_rle_and_battery(self) -> None:
+        transfer = TransferCapabilities()
+        self.assertTrue(update_transfer_status(b"mtu=244 rle=1", transfer))
+        self.assertFalse(update_transfer_status(b"t=1788027489 bat=2987", transfer))
+        self.assertEqual(transfer.max_write_length, 244)
+        self.assertTrue(transfer.rle)
+        self.assertEqual(transfer.battery_millivolts, 2987)
+        self.assertFalse(update_transfer_status(b"\xff\xff\x03", transfer))
 
 
 class EPDProtocolTest(unittest.IsolatedAsyncioTestCase):

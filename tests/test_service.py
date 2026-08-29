@@ -26,11 +26,13 @@ class FakeWeather:
 
 
 class FakeDisplay:
-    def __init__(self) -> None:
+    def __init__(self, battery_millivolts=None) -> None:
         self.images = []
+        self.battery_millivolts = battery_millivolts
 
     async def send_image(self, image):
         self.images.append(image.copy())
+        return self.battery_millivolts
 
 
 class FakeNotifier:
@@ -65,6 +67,27 @@ class ServiceTest(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(await service.run_once(now=NOW + timedelta(minutes=20)))
             self.assertEqual(len(display.images), 2)
             self.assertTrue(config.output_path.is_file())
+
+    async def test_battery_from_display_is_saved_for_next_render(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = AppConfig(
+                render=RenderConfig(font_path=DEFAULT_FONT_PATH),
+                output_path=root / "latest.png",
+                state_path=root / "state.json",
+            )
+            service = WeatherTagService(
+                config,
+                FakeWeather([snapshot()]),
+                WeatherRenderer(config.render),
+                FakeDisplay(battery_millivolts=2987),
+                FakeNotifier(),
+                StateStore(config.state_path),
+            )
+
+            self.assertTrue(await service.run_once(now=NOW))
+            self.assertEqual(service.state.battery_millivolts, 2987)
+            self.assertEqual(StateStore(config.state_path).load().battery_millivolts, 2987)
 
     async def test_failure_screen_and_notification_are_rate_limited(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -27,12 +27,13 @@ class EPDConnectionError(RuntimeError):
 
 
 class Display(Protocol):
-    async def send_image(self, image: Image.Image) -> None: ...
+    async def send_image(self, image: Image.Image) -> int | None: ...
 
 
 class DisabledDisplay:
-    async def send_image(self, image: Image.Image) -> None:
+    async def send_image(self, image: Image.Image) -> int | None:
         LOGGER.info("BLE 已禁用，仅保存渲染图片")
+        return None
 
 
 class BleEPDDisplay:
@@ -41,14 +42,13 @@ class BleEPDDisplay:
     def __init__(self, config: BleConfig) -> None:
         self.config = config
 
-    async def send_image(self, image: Image.Image) -> None:
+    async def send_image(self, image: Image.Image) -> int | None:
         black, red = encode_three_color(image)
         last_error: Exception | None = None
         last_reason = "未知错误"
         for attempt in range(1, self.config.retry_attempts + 1):
             try:
-                await self._send_planes(black, red)
-                return
+                return await self._send_planes(black, red)
             except Exception as exc:  # Bleak backend errors vary by platform.
                 last_error = exc
                 last_reason = describe_ble_error(exc, self.config.connect_timeout_seconds)
@@ -62,7 +62,7 @@ class BleEPDDisplay:
                     await asyncio.sleep(min(2 ** (attempt - 1), 4))
         raise EPDConnectionError(f"BLE 更新连续失败: {last_reason}") from last_error
 
-    async def _send_planes(self, black: bytes, red: bytes) -> None:
+    async def _send_planes(self, black: bytes, red: bytes) -> int | None:
         try:
             from bleak import BleakClient, BleakScanner
         except ImportError as exc:
@@ -87,14 +87,7 @@ class BleEPDDisplay:
         transfer = TransferCapabilities()
 
         def notification(_: object, payload: bytearray) -> None:
-            try:
-                text = bytes(payload).decode("ascii")
-            except UnicodeDecodeError:
-                return  # The first notification is normally binary device configuration.
-            match = re.search(r"mtu=(\d+)", text)
-            if match:
-                transfer.max_write_length = max(20, int(match.group(1)))
-                transfer.rle = "rle=1" in text
+            if update_transfer_status(bytes(payload), transfer):
                 notification_event.set()
 
         async with BleakClient(device, timeout=self.config.connect_timeout_seconds) as client:
@@ -120,6 +113,7 @@ class BleEPDDisplay:
             await self._write_plane(client.write_gatt_char, black, black_plane=True, capabilities=transfer)
             await self._write_plane(client.write_gatt_char, red, black_plane=False, capabilities=transfer)
             await self._refresh_and_wait(client.write_gatt_char)
+            return transfer.battery_millivolts
 
     async def _refresh_and_wait(self, writer: Callable[..., Awaitable[None]]) -> None:
         await writer(IMAGE_CHARACTERISTIC_UUID, bytes((CMD_REFRESH,)), response=True)
@@ -158,6 +152,28 @@ class BleEPDDisplay:
 class TransferCapabilities:
     max_write_length: int = 20
     rle: bool = False
+    battery_millivolts: int | None = None
+
+
+def update_transfer_status(payload: bytes, transfer: TransferCapabilities) -> bool:
+    """Apply an ASCII firmware notification and report whether MTU was updated."""
+    try:
+        message = payload.decode("ascii")
+    except UnicodeDecodeError:
+        return False  # The first notification is normally binary device configuration.
+
+    mtu_match = re.search(r"mtu=(\d+)", message)
+    if mtu_match:
+        transfer.max_write_length = max(20, int(mtu_match.group(1)))
+        transfer.rle = "rle=1" in message
+
+    battery_match = re.search(r"bat=(\d+)", message)
+    if battery_match:
+        millivolts = int(battery_match.group(1))
+        if 1_000 <= millivolts <= 5_000:
+            transfer.battery_millivolts = millivolts
+
+    return mtu_match is not None
 
 
 def describe_ble_error(error: Exception, timeout_seconds: float) -> str:

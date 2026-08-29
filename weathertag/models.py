@@ -131,6 +131,7 @@ class RuntimeState:
     last_snapshot: WeatherSnapshot | None = None
     last_screen_update: datetime | None = None
     last_failure_screen: datetime | None = None
+    battery_millivolts: int | None = None
     notification_times: dict[str, datetime] = field(default_factory=dict)
 
 

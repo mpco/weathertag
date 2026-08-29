@@ -27,6 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
     demo.add_argument("--scenario", choices=("normal", "upcoming", "rain", "warning", "failure"), default="normal")
     demo.add_argument("--output", type=Path, default=Path("var/demo.png"))
     demo.add_argument("--font", type=Path, default=DEFAULT_FONT_PATH)
+    demo.add_argument("--battery-millivolts", type=int, default=2987, help="示例电池电压，单位 mV")
 
     validate = sub.add_parser("validate-config", help="检查配置和 JWT 私钥")
     validate.add_argument("--config", type=Path, default=Path("config.toml"))
@@ -70,7 +71,13 @@ def _render_demo(args: argparse.Namespace) -> int:
         from .config import RuleConfig
 
         rules = RuleConfig()
-        image = renderer.render(snapshot, build_reminder(snapshot, rules), rules, rendered_at=now)
+        image = renderer.render(
+            snapshot,
+            build_reminder(snapshot, rules),
+            rules,
+            rendered_at=now,
+            battery_millivolts=args.battery_millivolts,
+        )
     renderer.save(image, args.output.resolve())
     print(args.output.resolve())
     return 0

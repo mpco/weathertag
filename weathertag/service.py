@@ -55,7 +55,13 @@ class WeatherTagService:
         should_refresh = force or restored_from_failure or material or scheduled
 
         reminder = build_reminder(snapshot, self.config.rules)
-        image = self.renderer.render(snapshot, reminder, self.config.rules, rendered_at=now)
+        image = self.renderer.render(
+            snapshot,
+            reminder,
+            self.config.rules,
+            rendered_at=now,
+            battery_millivolts=self.state.battery_millivolts,
+        )
         self.renderer.save(image, self.config.output_path)
         LOGGER.info(
             "天气更新成功: %s %d℃，提醒=%s，刷屏=%s",
@@ -66,7 +72,8 @@ class WeatherTagService:
         )
         if should_refresh:
             try:
-                await self.display.send_image(image)
+                battery_millivolts = await self.display.send_image(image)
+                self._remember_battery(battery_millivolts)
             except Exception as exc:
                 await self._display_failure(now, exc)
                 self.state_store.save(self.state)
@@ -104,12 +111,19 @@ class WeatherTagService:
         )
         if failure_refresh_due:
             try:
-                await self.display.send_image(image)
+                battery_millivolts = await self.display.send_image(image)
+                self._remember_battery(battery_millivolts)
                 self.state.last_failure_screen = now
                 self.state.last_screen_update = now
             except Exception as display_error:
                 await self._display_failure(now, display_error)
         self.state_store.save(self.state)
+
+    def _remember_battery(self, millivolts: int | None) -> None:
+        if millivolts is None:
+            return
+        self.state.battery_millivolts = millivolts
+        LOGGER.info("读取价签电池电压: %.2fV（下次刷屏显示）", millivolts / 1000)
 
     async def _display_failure(self, now: datetime, error: Exception) -> None:
         LOGGER.exception("电子价签更新失败", exc_info=error)

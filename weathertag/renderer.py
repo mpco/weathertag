@@ -30,14 +30,15 @@ class WeatherRenderer:
         rules: RuleConfig,
         *,
         rendered_at: datetime | None = None,
+        battery_millivolts: int | None = None,
     ) -> Image.Image:
         rendered_at = rendered_at or datetime.now().astimezone()
         image = Image.new("RGB", (self.config.width, self.config.height), WHITE)
         draw = ImageDraw.Draw(image)
 
-        self._header(draw, snapshot, rendered_at)
-        draw.line((8, 31, 392, 31), fill=BLACK, width=1)
-        draw.line((197, 39, 197, 166), fill=BLACK, width=1)
+        self._header(draw, rendered_at, battery_millivolts)
+        draw.line((8, 31, 392, 31), fill=BLACK, width=2)
+        draw.line((197, 39, 197, 166), fill=BLACK, width=2)
 
         self._current(draw, snapshot)
         self._forecast(draw, snapshot)
@@ -57,17 +58,18 @@ class WeatherRenderer:
         draw = ImageDraw.Draw(image)
         draw.rectangle((8, 8, 391, 291), outline=BLACK, width=2)
         draw.polygon(((40, 62), (75, 122), (5, 122)), outline=RED, fill=WHITE)
-        draw.text((40, 101), "!", font=self.font(35), fill=RED, anchor="mm")
-        draw.text((95, 72), "天气数据获取失败", font=self.font(28), fill=RED)
+        draw_text(draw, (40, 101), "!", font=self.font(35), fill=RED, anchor="mm")
+        draw_text(draw, (95, 72), "天气数据获取失败", font=self.font(28), fill=RED)
         draw.line((25, 142, 375, 142), fill=BLACK, width=1)
-        draw.text((200, 177), "暂时无法更新天气信息", font=self.font(23), fill=BLACK, anchor="mm")
+        draw_text(draw, (200, 177), "暂时无法更新天气信息", font=self.font(23), fill=BLACK, anchor="mm")
         if last_success:
             stamp = last_success.astimezone().strftime("%m月%d日 %H:%M")
             message = f"最后成功更新：{stamp}"
         else:
             message = "尚无成功获取记录"
-        draw.text((200, 218), message, font=self.font(18), fill=BLACK, anchor="mm")
-        draw.text(
+        draw_text(draw, (200, 218), message, font=self.font(18), fill=BLACK, anchor="mm")
+        draw_text(
+            draw,
             (200, 267),
             f"本次尝试 {rendered_at.strftime('%H:%M')}  ·  WeatherTag",
             font=self.font(13),
@@ -85,31 +87,44 @@ class WeatherRenderer:
             self._fonts[size] = ImageFont.truetype(str(self.config.font_path), size=size)
         return self._fonts[size]
 
-    def _header(self, draw: ImageDraw.ImageDraw, snapshot: WeatherSnapshot, rendered_at: datetime) -> None:
+    def _header(
+        self,
+        draw: ImageDraw.ImageDraw,
+        rendered_at: datetime,
+        battery_millivolts: int | None,
+    ) -> None:
         day = rendered_at
         left = f"{day.month}月{day.day}日  星期{WEEKDAYS[day.weekday()]}"
-        draw.text((8, 6), left, font=self.font(17), fill=BLACK)
-        draw.text((202, 10), "数据·和风天气", font=self.font(11), fill=BLACK)
-        draw.text((392, 7), f"更新 {rendered_at.strftime('%H:%M')}", font=self.font(15), fill=BLACK, anchor="ra")
+        draw_text(draw, (8, 16), left, font=self.font(16), fill=BLACK, anchor="lm")
+        draw_text(
+            draw,
+            (232, 16),
+            f"更新 {rendered_at.strftime('%H:%M')}",
+            font=self.font(14),
+            fill=BLACK,
+            anchor="mm",
+        )
+        draw_battery(draw, battery_millivolts, self.font(13))
 
     def _current(self, draw: ImageDraw.ImageDraw, snapshot: WeatherSnapshot) -> None:
         current = snapshot.current
         draw_weather_icon(draw, (49, 82), icon_category(current.icon), 36, BLACK)
-        draw.text((112, 45), f"{current.temperature}", font=self.font(58), fill=BLACK, anchor="ma")
-        draw.text((176, 54), "℃", font=self.font(24), fill=BLACK)
-        draw.text((111, 112), current.text, font=self.font(23), fill=BLACK, anchor="ma")
-        draw.text((111, 141), f"体感 {current.feels_like}℃", font=self.font(16), fill=BLACK, anchor="ma")
+        draw_text(draw, (112, 45), f"{current.temperature}", font=self.font(58), fill=BLACK, anchor="ma")
+        draw_text(draw, (176, 54), "℃", font=self.font(24), fill=BLACK)
+        draw_text(draw, (111, 112), current.text, font=self.font(23), fill=BLACK, anchor="ma")
+        draw_text(draw, (111, 141), f"体感 {current.feels_like}℃", font=self.font(16), fill=BLACK, anchor="ma")
 
     def _forecast(self, draw: ImageDraw.ImageDraw, snapshot: WeatherSnapshot) -> None:
-        draw.text((207, 39), "未来三天", font=self.font(14), fill=BLACK)
+        labels = ("今", "明", "后")
         for index, day in enumerate(snapshot.daily[:3]):
-            y = 72 + index * 43
-            label = "今" if index == 0 else WEEKDAYS[day.day.weekday()]
-            draw.text((211, y), label, font=self.font(17), fill=BLACK, anchor="lm")
+            y = 60 + index * 43
+            label = labels[index]
+            draw_text(draw, (211, y), label, font=self.font(17), fill=BLACK, anchor="lm")
             draw_weather_icon(draw, (258, y), icon_category(day.icon_day), 15, BLACK)
             weather = fit_text(draw, day.text_day, self.font(15), 61)
-            draw.text((280, y), weather, font=self.font(15), fill=BLACK, anchor="lm")
-            draw.text(
+            draw_text(draw, (280, y), weather, font=self.font(15), fill=BLACK, anchor="lm")
+            draw_text(
+                draw,
                 (392, y),
                 f"{day.min_temperature}~{day.max_temperature}°",
                 font=self.font(17),
@@ -122,7 +137,8 @@ class WeatherRenderer:
     def _today(self, draw: ImageDraw.ImageDraw, snapshot: WeatherSnapshot) -> None:
         today = snapshot.daily[0]
         draw.rounded_rectangle((8, 171, 392, 201), radius=5, outline=BLACK, width=1)
-        draw.text(
+        draw_text(
+            draw,
             (17, 186),
             f"今日 {today.min_temperature}℃～{today.max_temperature}℃",
             font=self.font(17),
@@ -130,8 +146,9 @@ class WeatherRenderer:
             anchor="lm",
         )
         wind = f"{snapshot.current.wind_direction}{snapshot.current.wind_scale}级"
-        draw.text((210, 186), wind, font=self.font(15), fill=BLACK, anchor="mm")
-        draw.text(
+        draw_text(draw, (210, 186), wind, font=self.font(15), fill=BLACK, anchor="mm")
+        draw_text(
+            draw,
             (382, 186),
             f"湿度 {snapshot.current.humidity}%",
             font=self.font(15),
@@ -149,7 +166,7 @@ class WeatherRenderer:
             summary = "降雨临近"
         else:
             summary = f"约{rain_in}分钟后可能有雨"
-        draw.text((8, 207), summary, font=self.font(14), fill=color)
+        draw_text(draw, (8, 207), summary, font=self.font(14), fill=color)
 
         values = [item.precipitation for item in snapshot.minutely[:24]]
         if not values:
@@ -163,8 +180,8 @@ class WeatherRenderer:
             height = 0 if value <= 0 else max(2, round((value / maximum) * (bottom - top)))
             x = chart_left + index * (chart_right - chart_left) / len(values)
             draw.rectangle((round(x), bottom - height, round(x) + width, bottom), fill=color)
-        draw.text((chart_left, 245), "现在", font=self.font(9), fill=BLACK)
-        draw.text((chart_right, 245), "2小时", font=self.font(9), fill=BLACK, anchor="ra")
+        draw_text(draw, (chart_left, 245), "现在", font=self.font(9), fill=BLACK)
+        draw_text(draw, (chart_right, 245), "2小时", font=self.font(9), fill=BLACK, anchor="ra")
 
     def _reminder(self, draw: ImageDraw.ImageDraw, reminder: Reminder) -> None:
         color = RED if reminder.use_red else BLACK
@@ -172,7 +189,39 @@ class WeatherRenderer:
         if reminder.use_red:
             draw.rectangle((8, 265, 13, 286), fill=RED)
         message = fit_text(draw, reminder.text, self.font(20), 346)
-        draw.text((200, 275), message, font=self.font(20), fill=color, anchor="mm")
+        draw_text(draw, (200, 275), message, font=self.font(20), fill=color, anchor="mm")
+
+
+def draw_text(
+    draw: ImageDraw.ImageDraw,
+    position: tuple[float, float],
+    text: str,
+    *,
+    font: ImageFont.FreeTypeFont,
+    fill: tuple[int, int, int],
+    anchor: str | None = None,
+) -> None:
+    """Render slightly heavier type without requiring a separate bold font file."""
+    draw.text(
+        position,
+        text,
+        font=font,
+        fill=fill,
+        anchor=anchor,
+        stroke_width=1 if font.size >= 13 else 0,
+        stroke_fill=fill,
+    )
+
+
+def draw_battery(
+    draw: ImageDraw.ImageDraw,
+    millivolts: int | None,
+    font: ImageFont.FreeTypeFont,
+) -> None:
+    draw.rounded_rectangle((311, 10, 332, 21), radius=2, outline=BLACK, width=2)
+    draw.rectangle((333, 13, 336, 18), fill=BLACK)
+    voltage = "--.--V" if millivolts is None else f"{millivolts / 1000:.2f}V"
+    draw_text(draw, (392, 16), voltage, font=font, fill=BLACK, anchor="rm")
 
 
 def fit_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, max_width: int) -> str:
