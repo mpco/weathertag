@@ -6,7 +6,7 @@ from pathlib import Path
 
 from weathertag.config import DEFAULT_FONT_PATH, RenderConfig, RuleConfig
 from weathertag.models import RuntimeState, WeatherSnapshot
-from weathertag.renderer import WeatherRenderer
+from weathertag.renderer import LAYOUT, RED, WeatherRenderer
 from weathertag.rules import build_reminder
 from weathertag.state import StateStore
 
@@ -30,6 +30,8 @@ class ModelsAndRendererTest(unittest.TestCase):
         )
         self.assertEqual(image.size, (400, 300))
         self.assertEqual(image.mode, "RGB")
+        self.assertEqual(LAYOUT.text_stroke_width, 0)
+        self.assertIn(RED, set(image.get_flattened_data()))
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "screen.png"
             renderer.save(image, target)

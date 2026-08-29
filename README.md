@@ -57,6 +57,17 @@ BLE 默认为关闭，此时命令会生成 `var/latest.png`，不会连接硬�
 
 协议帧、黑白红位面、MTU/RLE 以及连接故障的分阶段排查方法，详见 [EPD-nRF5 蓝牙协议与排障说明](docs/EPD-nRF5蓝牙协议.md)。
 
+## 手动微调界面
+
+400×300 画布的字体大小、坐标、行距、分隔线、电池位置和红色强调开关，集中定义在 `weathertag/renderer.py` 顶部的 `LAYOUT = ScreenLayout(...)` 参数块。修改后先离线生成预览，不会连接或刷新价签：
+
+```bash
+.venv/bin/weathertag render-demo --scenario normal --output var/layout-preview.png
+.venv/bin/weathertag render-demo --scenario warning --output var/layout-warning.png
+```
+
+`text_stroke_width` 建议保持 `0`。电子价签最终使用 1-bit 位面，无法稳定表现半像素描边；设为 `1` 会明显挤压小字号笔画。`use_current_accent` 可统一关闭或开启“当前”相关的红色装饰。
+
 ## 运行策略
 
 服务默认每 10 分钟查询一次天气，以便发现预警、降雨、天气分类或至少 2℃ 的变化；只有发生这些重要变化，或到达当前时段的常规刷新间隔时才刷新墨水屏。所有阈值和间隔都能在配置中调整。
