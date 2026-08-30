@@ -76,25 +76,14 @@ API 连续重试失败后，屏幕显示故障页并保留最后成功时间；�
 
 ## systemd 部署
 
-建议把项目放在 `/opt/weathertag`，配置和私钥放在 `/etc/weathertag`，运行状态放在 `/var/lib/weathertag`。生产配置中的 `state_path` 与 `output_path` 应改为绝对路径：
+完整的生产部署流程详见 [WeatherTag 部署与运行手册](docs/部署与运行.md)，内容包括：
 
-```toml
-[app]
-state_path = "/var/lib/weathertag/state.json"
-output_path = "/var/lib/weathertag/latest.png"
-```
-
-创建不可登录的 `weathertag` 用户，确保其能读取私钥并能通过系统 BlueZ 访问蓝牙，然后安装单元：
-
-```bash
-sudo cp deploy/weathertag.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now weathertag
-sudo systemctl status weathertag
-journalctl -u weathertag -f
-```
-
-不同发行版的 BlueZ D-Bus 权限策略不同；如出现 `org.bluez.Error.NotAuthorized`，应在系统策略中只授予 `weathertag` 用户 BLE 客户端权限。
+- 创建不可登录的 `weathertag` 专用用户；
+- 安装 Python、BlueZ、中文字体和虚拟环境；
+- 按最小权限划分 `/opt`、`/etc` 和 `/var/lib` 目录；
+- 生成和风天气 Ed25519 密钥并填写生产配置；
+- 以服务用户验证 API、文件权限、BLE 扫描和真机刷新；
+- 安装 systemd、查看日志、升级、回滚、备份和故障排查。
 
 ## 测试
 
