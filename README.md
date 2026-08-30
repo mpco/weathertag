@@ -76,14 +76,14 @@ API 连续重试失败后，屏幕显示故障页并保留最后成功时间；�
 
 ## systemd 部署
 
-完整的生产部署流程详见 [WeatherTag 部署与运行手册](docs/部署与运行.md)，内容包括：
+完整的 LXC 部署流程详见 [WeatherTag 部署与运行手册](docs/部署与运行.md)，默认以容器内 `root` 运行，所有数据保留在 `/root/weathertag` 项目目录。内容包括：
 
-- 创建不可登录的 `weathertag` 专用用户；
-- 安装 Python、BlueZ、中文字体和虚拟环境；
-- 按最小权限划分 `/opt`、`/etc` 和 `/var/lib` 目录；
-- 生成和风天气 Ed25519 密钥并填写生产配置；
-- 以服务用户验证 API、文件权限、BLE 扫描和真机刷新；
-- 安装 systemd、查看日志、升级、回滚、备份和故障排查。
+- 挂载宿主机 BlueZ D-Bus socket；
+- 设置 `DBUS_SYSTEM_BUS_ADDRESS=unix:path=/bt-dbus/system_bus_socket`；
+- 在项目内管理 `.venv`、`config.toml`、`secrets/` 和 `var/`；
+- 验证 API、BLE 扫描和真机刷新；
+- 使用 systemd 常驻运行，以及升级、回滚、备份和排障；
+- 需要更强进程隔离时，可选创建专用用户。
 
 ## 测试
 
