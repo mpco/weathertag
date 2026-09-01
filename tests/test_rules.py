@@ -4,7 +4,7 @@ import unittest
 
 from weathertag.config import RuleConfig
 from weathertag.models import ReminderKind, WeatherAlert
-from weathertag.rules import build_reminder, has_material_change
+from weathertag.rules import build_reminder, has_material_change, icon_category
 
 from .helpers import NOW, snapshot
 
@@ -50,6 +50,11 @@ class ReminderRulesTest(unittest.TestCase):
         self.assertTrue(has_material_change(before, snapshot(current_precip=0.1), self.rules))
         alert = WeatherAlert("new", "高温", "severe", "alert", NOW)
         self.assertTrue(has_material_change(before, snapshot(alerts=(alert,)), self.rules))
+
+    def test_night_icons_keep_their_night_category(self) -> None:
+        self.assertEqual(icon_category("150"), "clear_night")
+        self.assertEqual(icon_category("151"), "partly_cloudy_night")
+        self.assertNotEqual(icon_category("151"), icon_category("101"))
 
 
 if __name__ == "__main__":

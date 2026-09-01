@@ -24,7 +24,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     demo = sub.add_parser("render-demo", help="渲染无需 API 或硬件的示例图片")
-    demo.add_argument("--scenario", choices=("normal", "upcoming", "rain", "warning", "failure"), default="normal")
+    demo.add_argument(
+        "--scenario",
+        choices=("normal", "night", "upcoming", "rain", "warning", "failure"),
+        default="normal",
+    )
     demo.add_argument("--output", type=Path, default=Path("var/demo.png"))
     demo.add_argument("--font", type=Path, default=DEFAULT_FONT_PATH)
     demo.add_argument("--battery-millivolts", type=int, default=2987, help="示例电池电压，单位 mV")

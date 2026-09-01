@@ -84,8 +84,10 @@ def icon_category(icon: str) -> str:
         return "cloud"
     if code in {100, 150}:
         return "sunny" if code == 100 else "clear_night"
-    if code in {101, 102, 103, 151, 152, 153}:
+    if code in {101, 102, 103}:
         return "partly_cloudy"
+    if code in {151, 152, 153}:
+        return "partly_cloudy_night"
     if code in {104, 154}:
         return "cloud"
     if 300 <= code <= 304 or 350 <= code <= 351:

@@ -63,6 +63,7 @@ BLE 默认为关闭，此时命令会生成 `var/latest.png`，不会连接硬�
 
 ```bash
 .venv/bin/weathertag render-demo --scenario normal --output var/layout-preview.png
+.venv/bin/weathertag render-demo --scenario night --output var/layout-night.png
 .venv/bin/weathertag render-demo --scenario warning --output var/layout-warning.png
 ```
 

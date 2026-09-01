@@ -1,56 +1,52 @@
-[app]
-state_path = "var/state.json"
-output_path = "var/latest.png"
-log_level = "INFO"
+[app] # WeatherTag 本地运行参数。
+state_path = "var/state.json" # 状态文件路径；相对路径以 config.toml 所在目录为基准。
+output_path = "var/latest.png" # 每次渲染的最新 400×300 PNG 输出路径。
+log_level = "INFO" # 日志级别：DEBUG、INFO、WARNING、ERROR 或 CRITICAL。
 
-[qweather]
-# 在和风天气控制台“设置”中查看专属 API Host，不要使用即将停用的公共域名。
-api_host = "your-host.qweatherapi.com"
-project_id = "YOUR_PROJECT_ID"
-credential_id = "YOUR_CREDENTIAL_ID"
-private_key_path = "secrets/ed25519-private.pem"
-longitude = 116.41
-latitude = 39.92
-language = "zh"
-timeout_seconds = 15
-retry_attempts = 3
+[qweather] # 和风天气 API 与 Ed25519 JWT 认证参数。
+api_host = "your-host.qweatherapi.com" # 控制台“设置”中的专属 API Host，不要填通用公共域名。
+project_id = "YOUR_PROJECT_ID" # 和风天气控制台中的项目 ID。
+credential_id = "YOUR_CREDENTIAL_ID" # 已上传 Ed25519 公钥的 JWT 凭据 ID。
+private_key_path = "secrets/ed25519-private.pem" # Ed25519 私钥路径；请保持文件仅运行用户可读。
+longitude = 116.41 # 天气查询位置的经度，取值 -180 到 180。
+latitude = 39.92 # 天气查询位置的纬度，取值 -90 到 90。
+language = "zh" # 和风天气返回文本的语言代码。
+timeout_seconds = 15 # 单次和风天气 HTTP 请求超时秒数。
+retry_attempts = 3 # 天气 API 失败时的最大尝试次数。
 
-[ble]
-enabled = false
-# Linux 上优先填写稳定的设备地址；也可只填固件广播名称。
-address = ""
-name = ""
-connect_timeout_seconds = 20
-retry_attempts = 3
-write_ack_interval = 20
-# GATT 确认只表示刷新命令已接收；保持连接直到三色屏完成物理刷新。
-refresh_wait_seconds = 25
+[ble] # EPD-nRF5 电子价签的 BLE 连接和传输参数。
+enabled = false # 是否真实连接并刷新电子价签；联调前建议保持 false。
+address = "" # BLE 设备地址；Linux 上优先使用 scan-ble 获得的稳定地址。
+name = "" # BLE 广播名称；没有稳定地址时可用它匹配设备。
+connect_timeout_seconds = 20 # 建立 BLE/GATT 连接的单次超时秒数。
+retry_attempts = 3 # BLE 连接或更新失败时的最大尝试次数。
+write_ack_interval = 20 # 传输图像时每写入多少个分块等待一次固件确认。
+refresh_wait_seconds = 25 # 发送 REFRESH 后保持连接的秒数，避免三色屏刷新波形被提前中断。
 
-[gotify]
-enabled = false
-base_url = "https://push.example.com"
-token = ""
-priority = 7
-timeout_seconds = 10
-cooldown_minutes = 360
+[gotify] # 连续失败时的 Gotify 通知参数。
+enabled = false # 是否发送 Gotify 失败和恢复通知。
+base_url = "https://push.example.com" # Gotify 服务根地址，不要在末尾填写额外斜杠。
+token = "" # Gotify 应用 Token；配置文件应限制读取权限。
+priority = 7 # Gotify 消息优先级。
+timeout_seconds = 10 # 单次 Gotify HTTP 请求超时秒数。
+cooldown_minutes = 360 # 同类错误通知的最短间隔分钟数。
 
-[schedule]
-# API 每 10 分钟轮询；墨水屏只按下列节奏或遇到重要变化时刷新。
-poll_minutes = 10
-morning_minutes = 30
-daytime_minutes = 60
-evening_minutes = 30
-overnight_minutes = 120
+[schedule] # 天气轮询频率和不同时段的常规刷屏间隔。
+poll_minutes = 10 # 查询 API 并检查重要变化的间隔分钟数。
+morning_minutes = 30 # 06:00–09:00 没有重要变化时的常规刷屏间隔。
+daytime_minutes = 60 # 09:00–18:00 没有重要变化时的常规刷屏间隔。
+evening_minutes = 30 # 18:00–23:00 没有重要变化时的常规刷屏间隔。
+overnight_minutes = 120 # 23:00–06:00 没有重要变化时的常规刷屏间隔。
 
-[rules]
-rain_threshold_mm = 0.01
-high_temperature_c = 35
-cold_temperature_c = 5
-temperature_gap_c = 10
-significant_temperature_change_c = 2
-hourly_rain_probability = 50
+[rules] # 提醒内容、降雨判定和变化刷屏的阈值。
+rain_threshold_mm = 0.01 # 降水量达到此毫米值时视为有降水。
+high_temperature_c = 35 # 日最高温达到此摄氏度时触发高温提醒。
+cold_temperature_c = 5 # 当前或日最低温不高于此摄氏度时触发寒冷提醒。
+temperature_gap_c = 10 # 日最高与最低温差达到此值时触发昼夜温差提醒。
+significant_temperature_change_c = 2 # 当前温度较上次数据变化达到此值时立即刷屏。
+hourly_rain_probability = 50 # 缺少分钟降水数据时，小时降水概率达到此百分比则作为降雨兜底。
 
-[render]
-width = 400
-height = 300
-font_path = "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"
+[render] # 电子价签画布和字体参数。
+width = 400 # 画布宽度像素；当前硬件协议要求保持 400。
+height = 300 # 画布高度像素；当前硬件协议要求保持 300。
+font_path = "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc" # 渲染中文的 TrueType/OpenType 字体文件绝对路径。

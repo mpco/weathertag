@@ -31,6 +31,9 @@ class ScreenLayout:
     battery_voltage_font: int
     battery_outline: tuple[int, int, int, int]
     battery_terminal: tuple[int, int, int, int]
+    battery_empty_millivolts: int
+    battery_full_millivolts: int
+    battery_unknown_fill_ratio: float
     header_rule: tuple[int, int, int, int]
     main_rule: tuple[int, int, int, int]
     current_icon_center: tuple[int, int]
@@ -54,6 +57,7 @@ class ScreenLayout:
     forecast_row_y: tuple[int, int, int]
     forecast_rule_y: tuple[int, int]
     today_detail_position: tuple[int, int]
+    today_detail_anchor: str
     today_detail_font: int
     today_detail_max_width: int
     current_accent_bar: tuple[int, int, int, int]
@@ -73,54 +77,58 @@ class ScreenLayout:
 
 # 手动微调入口：修改这里后运行 `weathertag render-demo` 生成预览。
 LAYOUT = ScreenLayout(
-    text_stroke_width=0,
-    use_current_accent=True,
-    header_date_position=(8, 16),
-    header_date_font=17,
-    header_update_position=(225, 16),
-    header_update_font=15,
-    battery_voltage_position=(362, 16),
-    battery_voltage_font=13,
-    battery_outline=(369, 10, 389, 21),
-    battery_terminal=(390, 13, 392, 18),
-    header_rule=(8, 31, 392, 31),
-    main_rule=(197, 39, 197, 201),
-    current_icon_center=(43, 83),
-    current_icon_radius=34,
-    current_temperature_position=(108, 48),
-    current_temperature_font=58,
-    current_unit_position=(142, 57),
-    current_unit_font=24,
-    current_summary_position=(102, 151),
-    current_summary_font=17,
-    current_summary_max_width=180,
-    forecast_label_x=211,
-    forecast_label_font=17,
-    forecast_icon_x=251,
-    forecast_icon_radius=15,
-    forecast_weather_x=273,
-    forecast_weather_font=15,
-    forecast_weather_max_width=58,
-    forecast_temperature_x=392,
-    forecast_temperature_font=17,
-    forecast_row_y=(56, 121, 175),
-    forecast_rule_y=(94, 148),
-    today_detail_position=(211, 80),
-    today_detail_font=14,
-    today_detail_max_width=181,
-    current_accent_bar=(201, 41, 204, 92),
-    precipitation_summary_position=(8, 207),
-    precipitation_summary_font=14,
-    chart_left=190,
-    chart_right=391,
-    chart_top=209,
-    chart_bottom=243,
-    chart_label_y=245,
-    chart_label_font=9,
-    reminder_box=(8, 258, 392, 293),
-    reminder_position=(200, 275),
-    reminder_font=20,
-    reminder_max_width=346,
+    text_stroke_width=0,  # 全局文字描边像素；1-bit 屏建议保持 0。
+    use_current_accent=True,  # 是否用红色强调当前天气。
+    header_date_position=(8, 16),  # 顶栏日期的（x, y）中线位置。
+    header_date_font=17,  # 顶栏日期字号。
+    header_update_position=(225, 16),  # 顶栏更新时间的中心位置。
+    header_update_font=15,  # 顶栏更新时间字号。
+    battery_voltage_position=(362, 16),  # 电压文字的右中对齐位置。
+    battery_voltage_font=13,  # 电压文字字号。
+    battery_outline=(369, 10, 389, 21),  # 电池主体外框（左、上、右、下）。
+    battery_terminal=(390, 13, 392, 18),  # 电池右侧正极小块边界。
+    battery_empty_millivolts=2200,  # 电池填充比例视为 0% 的电压。
+    battery_full_millivolts=3000,  # 电池填充比例视为 100% 的电压。
+    battery_unknown_fill_ratio=0.5,  # 尚未读到电压时的默认填充比例。
+    header_rule=(8, 31, 392, 31),  # 顶栏下方水平分隔线。
+    main_rule=(197, 39, 197, 201),  # 当前天气与三日预报之间的竖线。
+    current_icon_center=(43, 83),  # 左侧当前天气图标中心。
+    current_icon_radius=34,  # 左侧当前天气图标半径。
+    current_temperature_position=(108, 48),  # 当前温度数字的中上对齐位置。
+    current_temperature_font=58,  # 当前温度数字字号。
+    current_unit_position=(142, 57),  # 当前温度单位的左上位置。
+    current_unit_font=24,  # 当前温度单位字号。
+    current_summary_position=(102, 157),  # 天气文字与体感温度的中心位置。
+    current_summary_font=22,  # 天气文字与体感温度字号。
+    current_summary_max_width=184,  # 天气文字与体感温度最大宽度。
+    forecast_label_x=211,  # “今/明/后”标签的左边 x 坐标。
+    forecast_label_font=17,  # “今/明/后”标签字号。
+    forecast_icon_x=251,  # 三日预报图标中心 x 坐标。
+    forecast_icon_radius=15,  # 三日预报图标半径。
+    forecast_weather_x=273,  # 三日预报天气文字左边 x 坐标。
+    forecast_weather_font=15,  # 三日预报天气文字字号。
+    forecast_weather_max_width=58,  # 三日预报天气文字最大宽度。
+    forecast_temperature_x=392,  # 三日高低温的右边 x 坐标。
+    forecast_temperature_font=17,  # 三日高低温字号。
+    forecast_row_y=(56, 121, 175),  # 今天、明天、后天三行的中线 y 坐标。
+    forecast_rule_y=(94, 148),  # 三日预报两条水平分隔线的 y 坐标。
+    today_detail_position=(392, 77),  # 今日风力/湿度的右中对齐位置。
+    today_detail_anchor="rm",  # 今日风力/湿度的 Pillow 文字锚点。
+    today_detail_font=14,  # 今日风力/湿度字号。
+    today_detail_max_width=181,  # 今日风力/湿度最大宽度。
+    current_accent_bar=(201, 41, 204, 92),  # “今”行左侧红色强调条边界。
+    precipitation_summary_position=(8, 207),  # 两小时降水摘要的左上位置。
+    precipitation_summary_font=14,  # 两小时降水摘要字号。
+    chart_left=190,  # 降水柱状图左边界。
+    chart_right=391,  # 降水柱状图右边界。
+    chart_top=209,  # 降水柱状图最高点。
+    chart_bottom=243,  # 降水柱状图基线。
+    chart_label_y=245,  # 降水图“现在/2小时”标签顶部 y 坐标。
+    chart_label_font=9,  # 降水图时间标签字号。
+    reminder_box=(8, 258, 392, 293),  # 底部提醒框边界。
+    reminder_position=(200, 275),  # 底部提醒文字中心位置。
+    reminder_font=20,  # 底部提醒文字字号。
+    reminder_max_width=346,  # 底部提醒文字最大宽度。
 )
 
 
@@ -318,6 +326,7 @@ class WeatherRenderer:
             today_detail,
             font=today_detail_font,
             fill=BLACK,
+            anchor=LAYOUT.today_detail_anchor,
         )
         for y in LAYOUT.forecast_rule_y:
             draw.line((207, y, 392, y), fill=BLACK, width=1)
@@ -415,6 +424,18 @@ def draw_battery(
 ) -> None:
     draw.rounded_rectangle(LAYOUT.battery_outline, radius=2, outline=BLACK, width=1)
     draw.rectangle(LAYOUT.battery_terminal, fill=BLACK)
+    if millivolts is None:
+        fill_ratio = LAYOUT.battery_unknown_fill_ratio
+    else:
+        voltage_range = max(1, LAYOUT.battery_full_millivolts - LAYOUT.battery_empty_millivolts)
+        fill_ratio = (millivolts - LAYOUT.battery_empty_millivolts) / voltage_range
+        fill_ratio = min(1.0, max(0.0, fill_ratio))
+    left, top, right, bottom = LAYOUT.battery_outline
+    inner_left, inner_top = left + 2, top + 2
+    inner_right, inner_bottom = right - 2, bottom - 2
+    fill_right = round(inner_left + (inner_right - inner_left) * fill_ratio)
+    if fill_right > inner_left:
+        draw.rectangle((inner_left, inner_top, fill_right, inner_bottom), fill=BLACK)
     voltage = "--.--V" if millivolts is None else f"{millivolts / 1000:.2f}V"
     draw_text(draw, LAYOUT.battery_voltage_position, voltage, font=font, fill=BLACK, anchor="rm")
 
@@ -437,11 +458,10 @@ def draw_weather_icon(
 ) -> None:
     x, y = center
     width = max(2, radius // 10)
-    if category in {"sunny", "clear_night"}:
-        if category == "clear_night":
-            draw.ellipse((x - radius * .55, y - radius * .55, x + radius * .55, y + radius * .55), outline=color, width=width)
-            draw.ellipse((x - radius * .2, y - radius * .7, x + radius * .7, y + radius * .25), fill=WHITE)
-            return
+    if category == "clear_night":
+        draw_moon(draw, center, radius, color, show_stars=True)
+        return
+    if category == "sunny":
         draw.ellipse((x - radius * .45, y - radius * .45, x + radius * .45, y + radius * .45), outline=color, width=width)
         for angle in range(0, 360, 45):
             rad = math.radians(angle)
@@ -460,6 +480,14 @@ def draw_weather_icon(
     cloud_y = y + radius * .08
     if category == "partly_cloudy":
         draw.ellipse((x - radius * .8, y - radius * .8, x + radius * .15, y + radius * .15), outline=color, width=width)
+    elif category == "partly_cloudy_night":
+        draw_moon(
+            draw,
+            (round(x - radius * .35), round(y - radius * .3)),
+            round(radius * .68),
+            color,
+            show_stars=False,
+        )
     draw.ellipse((x - radius * .72, cloud_y - radius * .18, x - radius * .18, cloud_y + radius * .36), fill=WHITE, outline=color, width=width)
     draw.ellipse((x - radius * .38, cloud_y - radius * .55, x + radius * .37, cloud_y + radius * .28), fill=WHITE, outline=color, width=width)
     draw.ellipse((x + radius * .02, cloud_y - radius * .24, x + radius * .68, cloud_y + radius * .36), fill=WHITE, outline=color, width=width)
@@ -482,3 +510,51 @@ def draw_weather_icon(
     elif category == "fog":
         for offset in (.58, .78, .98):
             draw.line((x - radius * .65, y + radius * offset, x + radius * .65, y + radius * offset), fill=color, width=width)
+
+
+def draw_moon(
+    draw: ImageDraw.ImageDraw,
+    center: tuple[int, int],
+    radius: int,
+    color: tuple[int, int, int],
+    *,
+    show_stars: bool,
+) -> None:
+    """Draw a bold crescent silhouette that remains legible on a 1-bit plane."""
+    x, y = center
+    moon_radius = radius * .62
+    draw.ellipse(
+        (x - moon_radius, y - moon_radius, x + moon_radius, y + moon_radius),
+        fill=color,
+    )
+    draw.ellipse(
+        (x - radius * .12, y - radius * .72, x + radius * .65, y + radius * .12),
+        fill=WHITE,
+    )
+    if not show_stars:
+        return
+    draw_star(draw, (round(x + radius * .58), round(y - radius * .45)), max(2, radius // 9), color)
+    draw_star(draw, (round(x + radius * .78), round(y + radius * .02)), max(2, radius // 12), color)
+
+
+def draw_star(
+    draw: ImageDraw.ImageDraw,
+    center: tuple[int, int],
+    radius: int,
+    color: tuple[int, int, int],
+) -> None:
+    """Draw a compact four-point star without relying on anti-aliasing."""
+    x, y = center
+    draw.polygon(
+        (
+            (x, y - radius),
+            (x + 1, y - 1),
+            (x + radius, y),
+            (x + 1, y + 1),
+            (x, y + radius),
+            (x - 1, y + 1),
+            (x - radius, y),
+            (x - 1, y - 1),
+        ),
+        fill=color,
+    )

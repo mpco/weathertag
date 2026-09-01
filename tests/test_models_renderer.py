@@ -4,9 +4,19 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from PIL import Image, ImageDraw
+
 from weathertag.config import DEFAULT_FONT_PATH, RenderConfig, RuleConfig
 from weathertag.models import RuntimeState, WeatherSnapshot
-from weathertag.renderer import LAYOUT, RED, WeatherRenderer
+from weathertag.renderer import (
+    BLACK,
+    LAYOUT,
+    RED,
+    WHITE,
+    WeatherRenderer,
+    draw_battery,
+    draw_weather_icon,
+)
 from weathertag.rules import build_reminder
 from weathertag.state import StateStore
 
@@ -42,6 +52,22 @@ class ModelsAndRendererTest(unittest.TestCase):
             store = StateStore(Path(directory) / "state.json")
             store.save(RuntimeState(battery_millivolts=2987))
             self.assertEqual(store.load().battery_millivolts, 2987)
+
+    def test_battery_icon_is_filled_from_voltage(self) -> None:
+        renderer = WeatherRenderer(RenderConfig(font_path=DEFAULT_FONT_PATH))
+        image = Image.new("RGB", (400, 30), WHITE)
+        draw_battery(ImageDraw.Draw(image), 2987, renderer.font(LAYOUT.battery_voltage_font))
+        self.assertEqual(image.getpixel((386, 15)), BLACK)
+
+        unknown = Image.new("RGB", (400, 30), WHITE)
+        draw_battery(ImageDraw.Draw(unknown), None, renderer.font(LAYOUT.battery_voltage_font))
+        self.assertEqual(unknown.getpixel((386, 15)), WHITE)
+
+    def test_clear_night_icon_has_a_bold_crescent_and_stars(self) -> None:
+        image = Image.new("RGB", (100, 100), WHITE)
+        draw_weather_icon(ImageDraw.Draw(image), (50, 50), "clear_night", 30)
+        self.assertEqual(image.getpixel((37, 50)), BLACK)
+        self.assertEqual(image.getpixel((67, 36)), BLACK)
 
 
 if __name__ == "__main__":
