@@ -42,11 +42,18 @@ class ModelsAndRendererTest(unittest.TestCase):
         self.assertEqual(image.size, (400, 300))
         self.assertEqual(image.mode, "RGB")
         self.assertEqual(LAYOUT.text_stroke_width, 0)
+        self.assertEqual(LAYOUT.chart_label_font, 12)
         self.assertIn(RED, set(image.get_flattened_data()))
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "screen.png"
             renderer.save(image, target)
             self.assertGreater(target.stat().st_size, 1_000)
+
+    def test_renderer_rejects_missing_small_font(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            missing = Path(directory) / "missing.ttf"
+            with self.assertRaisesRegex(FileNotFoundError, "小字号字体不存在"):
+                WeatherRenderer(RenderConfig(font_path=DEFAULT_FONT_PATH, small_font_path=missing))
 
     def test_precipitation_detail_uses_api_type_and_peak_amount(self) -> None:
         weather = snapshot(rain_after=30)

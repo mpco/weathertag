@@ -49,4 +49,5 @@ hourly_rain_probability = 50 # 缺少分钟降水数据时，小时降水概率�
 [render] # 电子价签画布和字体参数。
 width = 400 # 画布宽度像素；当前硬件协议要求保持 400。
 height = 300 # 画布高度像素；当前硬件协议要求保持 300。
-font_path = "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc" # 渲染中文的 TrueType/OpenType 字体文件绝对路径。
+font_path = "var/fonts/sarasa/SarasaUiSC-Regular.ttf" # 12px 以上的主要界面文字。
+small_font_path = "var/fonts/fusion-pixel/fusion-pixel-12px-proportional-zh_hans.ttf" # 12px 图表标签。

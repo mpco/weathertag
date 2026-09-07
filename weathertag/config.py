@@ -82,6 +82,7 @@ class RenderConfig:
     width: int = 400
     height: int = 300
     font_path: Path = DEFAULT_FONT_PATH
+    small_font_path: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +149,8 @@ def load_config(path: str | Path, environ: Mapping[str, str] | None = None) -> A
     private_path_raw = _env(env, "WEATHERTAG_QWEATHER_PRIVATE_KEY_PATH", qw.get("private_key_path", ""))
     private_path = _resolve_path(base, private_path_raw) if private_path_raw else None
     font_path = _resolve_path(base, render.get("font_path", str(DEFAULT_FONT_PATH)))
+    small_font_path_raw = render.get("small_font_path", "")
+    small_font_path = _resolve_path(base, small_font_path_raw) if small_font_path_raw else None
 
     return AppConfig(
         qweather=QWeatherConfig(
@@ -185,6 +188,7 @@ def load_config(path: str | Path, environ: Mapping[str, str] | None = None) -> A
             width=int(render.get("width", 400)),
             height=int(render.get("height", 300)),
             font_path=font_path,
+            small_font_path=small_font_path,
         ),
         state_path=_resolve_path(base, app.get("state_path", "var/state.json")),
         output_path=_resolve_path(base, app.get("output_path", "var/latest.png")),

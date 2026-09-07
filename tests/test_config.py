@@ -24,12 +24,15 @@ latitude = 39.92
 [ble]
 enabled = false
 refresh_wait_seconds = 30
+[render]
+small_font_path = "fonts/small.ttf"
 """,
                 encoding="utf-8",
             )
             config = load_config(config_file, {"WEATHERTAG_BLE_ENABLED": "true", "WEATHERTAG_BLE_NAME": "EPD"})
             self.assertEqual(config.qweather.api_host, "example.qweatherapi.com")
             self.assertEqual(config.qweather.private_key_path, root / "secret.pem")
+            self.assertEqual(config.render.small_font_path, root / "fonts/small.ttf")
             self.assertTrue(config.ble.enabled)
             self.assertEqual(config.ble.refresh_wait_seconds, 30)
             config.validate()

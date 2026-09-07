@@ -148,7 +148,7 @@ LAYOUT = ScreenLayout(
     chart_top=209,  # 降水柱状图最高点。
     chart_bottom=243,  # 降水柱状图基线。
     chart_label_y=245,  # 降水图“现在/2小时”标签顶部 y 坐标。
-    chart_label_font=9,  # 降水图时间标签字号。
+    chart_label_font=12,  # 降水图时间标签字号，界面最小字号。
     reminder_box=(8, 258, 392, 293),  # 底部提醒框边界。
     reminder_position=(200, 275),  # 底部提醒文字中心位置。
     reminder_font=20,  # 底部提醒文字字号。
@@ -201,7 +201,10 @@ class WeatherRenderer:
         self.config = config
         if not config.font_path.is_file():
             raise FileNotFoundError(f"中文字体不存在: {config.font_path}")
+        if config.small_font_path is not None and not config.small_font_path.is_file():
+            raise FileNotFoundError(f"小字号字体不存在: {config.small_font_path}")
         self._fonts: dict[int, ImageFont.FreeTypeFont] = {}
+        self._small_fonts: dict[int, ImageFont.FreeTypeFont] = {}
 
     def render(
         self,
@@ -265,6 +268,12 @@ class WeatherRenderer:
         if size not in self._fonts:
             self._fonts[size] = ImageFont.truetype(str(self.config.font_path), size=size)
         return self._fonts[size]
+
+    def small_font(self, size: int) -> ImageFont.FreeTypeFont:
+        if size not in self._small_fonts:
+            path = self.config.small_font_path or self.config.font_path
+            self._small_fonts[size] = ImageFont.truetype(str(path), size=size)
+        return self._small_fonts[size]
 
     def _header(
         self,
@@ -450,14 +459,14 @@ class WeatherRenderer:
             draw,
             (chart_left, LAYOUT.chart_label_y),
             "现在",
-            font=self.font(LAYOUT.chart_label_font),
+            font=self.small_font(LAYOUT.chart_label_font),
             fill=BLACK,
         )
         draw_text(
             draw,
             (chart_right, LAYOUT.chart_label_y),
             "2小时",
-            font=self.font(LAYOUT.chart_label_font),
+            font=self.small_font(LAYOUT.chart_label_font),
             fill=BLACK,
             anchor="ra",
         )

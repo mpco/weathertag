@@ -31,6 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     demo.add_argument("--output", type=Path, default=Path("var/demo.png"))
     demo.add_argument("--font", type=Path, default=DEFAULT_FONT_PATH)
+    demo.add_argument("--small-font", type=Path, default=None)
     demo.add_argument("--battery-millivolts", type=int, default=2987, help="示例电池电压，单位 mV")
 
     validate = sub.add_parser("validate-config", help="检查配置和 JWT 私钥")
@@ -66,7 +67,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _render_demo(args: argparse.Namespace) -> int:
-    renderer = WeatherRenderer(RenderConfig(font_path=args.font))
+    renderer = WeatherRenderer(RenderConfig(font_path=args.font, small_font_path=args.small_font))
     now = datetime.now().astimezone()
     if args.scenario == "failure":
         image = renderer.render_failure(now, rendered_at=now)
@@ -92,6 +93,8 @@ def _validate(path: Path) -> int:
     config.validate()
     if not config.render.font_path.is_file():
         raise ConfigError(f"字体文件不存在: {config.render.font_path}")
+    if config.render.small_font_path is not None and not config.render.small_font_path.is_file():
+        raise ConfigError(f"小字号字体文件不存在: {config.render.small_font_path}")
     JWTProvider(config.qweather).token()
     print("配置有效")
     return 0

@@ -25,6 +25,8 @@ python3 -m venv .venv
 cp config.example.toml config.toml
 ```
 
+`config.example.toml` 使用 Sarasa UI SC Regular 和 Fusion Pixel 12px；首次运行前请按[部署手册中的字体下载命令](docs/部署与运行.md#下载界面字体)安装到项目内的 `var/fonts/`。
+
 和风天气 JWT 使用 Ed25519 密钥。生成密钥并把公钥添加到和风控制台的 JWT 凭据中：
 
 ```bash
@@ -67,7 +69,7 @@ BLE 默认为关闭，此时命令会生成 `var/latest.png`，不会连接硬�
 .venv/bin/weathertag render-demo --scenario warning --output var/layout-warning.png
 ```
 
-`text_stroke_width` 建议保持 `0`。电子价签最终使用 1-bit 位面，无法稳定表现半像素描边；设为 `1` 会明显挤压小字号笔画。`use_current_accent` 可统一关闭或开启“当前”相关的红色装饰。
+`text_stroke_width` 建议保持 `0`。电子价签最终使用 1-bit 位面，无法稳定表现半像素描边；设为 `1` 会明显挤压小字号笔画。界面最小字号为 12px，`small_font_path` 只用于这一尺寸的降水图时间标签；`use_current_accent` 可统一关闭或开启“当前”相关的红色装饰。
 
 ## 运行策略
 
