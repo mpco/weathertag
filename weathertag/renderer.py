@@ -9,12 +9,28 @@ from PIL import Image, ImageDraw, ImageFont
 
 from .config import RenderConfig, RuleConfig
 from .models import Reminder, WeatherSnapshot
-from .rules import icon_category, upcoming_rain_minutes
+from .rules import format_rain_period, icon_category, upcoming_rain_period
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 RED = (220, 0, 0)
 WEEKDAYS = "一二三四五六日"
+PRECIPITATION_TERMS = (
+    "特大暴雨",
+    "大暴雨",
+    "雨夹雪",
+    "雷阵雨",
+    "暴雨",
+    "阵雨",
+    "大雨",
+    "中雨",
+    "小雨",
+    "暴雪",
+    "大雪",
+    "中雪",
+    "小雪",
+    "冻雨",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +79,10 @@ class ScreenLayout:
     current_accent_bar: tuple[int, int, int, int]
     precipitation_summary_position: tuple[int, int]
     precipitation_summary_font: int
+    precipitation_summary_max_width: int
+    precipitation_detail_position: tuple[int, int]
+    precipitation_detail_font: int
+    precipitation_detail_max_width: int
     chart_left: int
     chart_right: int
     chart_top: int
@@ -117,8 +137,12 @@ LAYOUT = ScreenLayout(
     today_detail_font=14,  # 今日风力/湿度字号。
     today_detail_max_width=181,  # 今日风力/湿度最大宽度。
     current_accent_bar=(201, 41, 204, 92),  # “今”行左侧红色强调条边界。
-    precipitation_summary_position=(8, 207),  # 两小时降水摘要的左上位置。
+    precipitation_summary_position=(96, 216),  # 左侧降水摘要的居中位置。
     precipitation_summary_font=14,  # 两小时降水摘要字号。
+    precipitation_summary_max_width=176,  # 降水时段文字最大宽度。
+    precipitation_detail_position=(96, 239),  # 降水类型和峰值的居中位置。
+    precipitation_detail_font=12,  # 降水详情字号。
+    precipitation_detail_max_width=176,  # 降水详情文字最大宽度。
     chart_left=190,  # 降水柱状图左边界。
     chart_right=391,  # 降水柱状图右边界。
     chart_top=209,  # 降水柱状图最高点。
@@ -130,6 +154,46 @@ LAYOUT = ScreenLayout(
     reminder_font=20,  # 底部提醒文字字号。
     reminder_max_width=346,  # 底部提醒文字最大宽度。
 )
+
+
+def precipitation_detail(
+    snapshot: WeatherSnapshot,
+    rain_period: tuple[datetime, datetime],
+    rules: RuleConfig,
+) -> str:
+    """使用 API 的降水摘要、类型和定量预报组成简短详情。"""
+    start, end = rain_period
+    condition = next(
+        (term for term in PRECIPITATION_TERMS if term in snapshot.minutely_summary),
+        "",
+    )
+    rainy_minutes = tuple(
+        item
+        for item in snapshot.minutely
+        if start <= item.forecast_at < end
+        and item.precipitation >= rules.rain_threshold_mm
+    )
+    if rainy_minutes:
+        if not condition:
+            kinds = {item.kind.lower() for item in rainy_minutes}
+            if kinds == {"snow"}:
+                condition = "雪"
+            elif "snow" in kinds:
+                condition = "雨雪"
+            else:
+                condition = "雨"
+        peak = max(item.precipitation for item in rainy_minutes)
+        peak_text = f"{peak:.2f}".rstrip("0").rstrip(".")
+        return f"{condition} · 峰值{peak_text}mm"
+
+    rainy_hours = tuple(
+        item for item in snapshot.hourly if start <= item.forecast_at < end
+    )
+    if rainy_hours:
+        weather = next((item.text for item in rainy_hours if item.text), condition or "有雨")
+        probability = max(item.precipitation_probability for item in rainy_hours)
+        return f"{weather} · 降水概率{probability}%"
+    return condition
 
 
 class WeatherRenderer:
@@ -334,22 +398,41 @@ class WeatherRenderer:
             draw.rectangle(LAYOUT.current_accent_bar, fill=RED)
 
     def _precipitation(self, draw: ImageDraw.ImageDraw, snapshot: WeatherSnapshot, rules: RuleConfig) -> None:
-        rain_in = upcoming_rain_minutes(snapshot, rules)
+        rain_period = upcoming_rain_period(snapshot, rules)
         has_rain = any(item.precipitation >= rules.rain_threshold_mm for item in snapshot.minutely)
         color = RED if has_rain else BLACK
-        if rain_in is None:
+        if rain_period is None:
             summary = "未来2小时无明显降雨"
-        elif rain_in <= 5:
-            summary = "降雨临近"
+            detail = ""
         else:
-            summary = f"约{rain_in}分钟后可能有雨"
+            summary = format_rain_period(rain_period)
+            detail = precipitation_detail(snapshot, rain_period, rules)
+        summary_font = self.font(LAYOUT.precipitation_summary_font)
+        if detail:
+            summary_position = LAYOUT.precipitation_summary_position
+        else:
+            summary_position = (
+                LAYOUT.precipitation_summary_position[0],
+                (LAYOUT.precipitation_summary_position[1] + LAYOUT.precipitation_detail_position[1]) // 2,
+            )
         draw_text(
             draw,
-            LAYOUT.precipitation_summary_position,
-            summary,
-            font=self.font(LAYOUT.precipitation_summary_font),
+            summary_position,
+            fit_text(draw, summary, summary_font, LAYOUT.precipitation_summary_max_width),
+            font=summary_font,
             fill=color,
+            anchor="mm",
         )
+        if detail:
+            detail_font = self.font(LAYOUT.precipitation_detail_font)
+            draw_text(
+                draw,
+                LAYOUT.precipitation_detail_position,
+                fit_text(draw, detail, detail_font, LAYOUT.precipitation_detail_max_width),
+                font=detail_font,
+                fill=color,
+                anchor="mm",
+            )
 
         values = [item.precipitation for item in snapshot.minutely[:24]]
         if not values:

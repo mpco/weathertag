@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
+from datetime import datetime, timedelta
+from typing import TypeVar
+
 from .config import RuleConfig
-from .models import Reminder, ReminderKind, WeatherSnapshot
+from .models import HourlyForecast, MinutePrecipitation, Reminder, ReminderKind, WeatherSnapshot
 
 
 _SEVERITY = {"unknown": 0, "minor": 1, "moderate": 2, "severe": 3, "extreme": 4}
@@ -15,10 +19,13 @@ def build_reminder(snapshot: WeatherSnapshot, config: RuleConfig) -> Reminder:
     if is_currently_raining(snapshot, config):
         return Reminder(ReminderKind.RAINING, "正在下雨，建议带伞", True)
 
-    rain_in = upcoming_rain_minutes(snapshot, config)
-    if rain_in is not None:
-        rounded = max(5, int(round(rain_in / 5) * 5))
-        return Reminder(ReminderKind.UPCOMING_RAIN, f"约{rounded}分钟后可能有雨，建议带伞", True)
+    rain_period = upcoming_rain_period(snapshot, config)
+    if rain_period is not None:
+        return Reminder(
+            ReminderKind.UPCOMING_RAIN,
+            f"{format_rain_period(rain_period)}，建议带伞",
+            True,
+        )
 
     today = snapshot.daily[0]
     if today.max_temperature >= config.high_temperature_c:
@@ -40,23 +47,85 @@ def is_currently_raining(snapshot: WeatherSnapshot, config: RuleConfig) -> bool:
 
 
 def upcoming_rain_minutes(snapshot: WeatherSnapshot, config: RuleConfig) -> int | None:
-    baseline = snapshot.current.observed_at
-    for item in snapshot.minutely:
-        if item.precipitation >= config.rain_threshold_mm:
-            return max(0, round((item.forecast_at - baseline).total_seconds() / 60))
+    """返回距下一段降雨开始的分钟数，保留作为兼容接口。"""
+    period = upcoming_rain_period(snapshot, config)
+    if period is None:
+        return None
+    return max(
+        0,
+        round((period[0] - snapshot.current.observed_at).total_seconds() / 60),
+    )
+
+
+def upcoming_rain_period(
+    snapshot: WeatherSnapshot,
+    config: RuleConfig,
+) -> tuple[datetime, datetime] | None:
+    """返回下一个连续降雨时段的 [开始, 结束) 时间。"""
+    period = _first_matching_period(
+        snapshot.minutely,
+        lambda item: item.precipitation >= config.rain_threshold_mm,
+        default_step=timedelta(minutes=5),
+    )
+    if period is not None:
+        return period
 
     # Minutely precipitation is limited to China. Hourly data is a conservative
     # fallback for installations where that endpoint returns no points.
-    for item in snapshot.hourly:
-        minutes = round((item.forecast_at - baseline).total_seconds() / 60)
-        if minutes > 120:
-            break
-        if item.precipitation >= config.rain_threshold_mm or (
+    cutoff = snapshot.current.observed_at + timedelta(minutes=120)
+    hourly = tuple(item for item in snapshot.hourly if item.forecast_at <= cutoff)
+    return _first_matching_period(
+        hourly,
+        lambda item: item.precipitation >= config.rain_threshold_mm
+        or (
             item.precipitation_probability >= config.hourly_rain_probability
             and icon_category(item.icon) in {"rain", "storm", "snow"}
-        ):
-            return max(0, minutes)
-    return None
+        ),
+        default_step=timedelta(hours=1),
+    )
+
+
+def format_rain_period(period: tuple[datetime, datetime]) -> str:
+    """将降雨时段格式化为在屏幕上不会随查看时间变旧的绝对时间。"""
+    start, end = period
+    start_text = start.strftime("%H:%M")
+    if end.date() == start.date():
+        end_text = end.strftime("%H:%M")
+    elif end.date() == start.date() + timedelta(days=1):
+        end_text = f"次日{end:%H:%M}"
+    else:
+        end_text = end.strftime("%m月%d日%H:%M")
+    return f"{start_text} 〜 {end_text} 有雨"
+
+
+_Forecast = TypeVar("_Forecast", MinutePrecipitation, HourlyForecast)
+
+
+def _first_matching_period(
+    forecasts: Sequence[_Forecast],
+    matches: Callable[[_Forecast], bool],
+    *,
+    default_step: timedelta,
+) -> tuple[datetime, datetime] | None:
+    start_index = next((index for index, item in enumerate(forecasts) if matches(item)), None)
+    if start_index is None:
+        return None
+
+    end_index = start_index + 1
+    while end_index < len(forecasts) and matches(forecasts[end_index]):
+        end_index += 1
+
+    start = forecasts[start_index].forecast_at
+    if end_index < len(forecasts):
+        end = forecasts[end_index].forecast_at
+    else:
+        step = default_step
+        if len(forecasts) >= 2:
+            inferred = forecasts[-1].forecast_at - forecasts[-2].forecast_at
+            if inferred > timedelta(0):
+                step = inferred
+        end = forecasts[-1].forecast_at + step
+    return start, end
 
 
 def has_material_change(

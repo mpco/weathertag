@@ -16,8 +16,9 @@ from weathertag.renderer import (
     WeatherRenderer,
     draw_battery,
     draw_weather_icon,
+    precipitation_detail,
 )
-from weathertag.rules import build_reminder
+from weathertag.rules import build_reminder, upcoming_rain_period
 from weathertag.state import StateStore
 
 from .helpers import snapshot
@@ -46,6 +47,13 @@ class ModelsAndRendererTest(unittest.TestCase):
             target = Path(directory) / "screen.png"
             renderer.save(image, target)
             self.assertGreater(target.stat().st_size, 1_000)
+
+    def test_precipitation_detail_uses_api_type_and_peak_amount(self) -> None:
+        weather = snapshot(rain_after=30)
+        rules = RuleConfig()
+        period = upcoming_rain_period(weather, rules)
+        self.assertIsNotNone(period)
+        self.assertEqual(precipitation_detail(weather, period, rules), "雨 · 峰值0.1mm")
 
     def test_battery_voltage_survives_state_round_trip(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

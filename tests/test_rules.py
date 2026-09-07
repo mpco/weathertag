@@ -4,7 +4,13 @@ import unittest
 
 from weathertag.config import RuleConfig
 from weathertag.models import ReminderKind, WeatherAlert
-from weathertag.rules import build_reminder, has_material_change, icon_category
+from weathertag.rules import (
+    build_reminder,
+    format_rain_period,
+    has_material_change,
+    icon_category,
+    upcoming_rain_period,
+)
 
 from .helpers import NOW, snapshot
 
@@ -31,6 +37,10 @@ class ReminderRulesTest(unittest.TestCase):
             ReminderKind.UPCOMING_RAIN,
         )
         self.assertEqual(
+            build_reminder(snapshot(rain_after=30), self.rules).text,
+            "09:00 〜 10:30 有雨，建议带伞",
+        )
+        self.assertEqual(
             build_reminder(snapshot(maximum=38), self.rules).kind,
             ReminderKind.EXTREME_TEMPERATURE,
         )
@@ -55,6 +65,28 @@ class ReminderRulesTest(unittest.TestCase):
         self.assertEqual(icon_category("150"), "clear_night")
         self.assertEqual(icon_category("151"), "partly_cloudy_night")
         self.assertNotEqual(icon_category("151"), icon_category("101"))
+
+    def test_upcoming_rain_period_ends_at_first_dry_forecast(self) -> None:
+        weather = snapshot(rain_after=30)
+        minutes = tuple(
+            item if index < 10 else type(item)(item.forecast_at, 0, item.kind)
+            for index, item in enumerate(weather.minutely)
+        )
+        weather = type(weather)(
+            weather.fetched_at,
+            weather.api_updated_at,
+            weather.current,
+            weather.daily,
+            weather.hourly,
+            minutes,
+            weather.minutely_summary,
+            weather.alerts,
+        )
+
+        period = upcoming_rain_period(weather, self.rules)
+
+        self.assertIsNotNone(period)
+        self.assertEqual(format_rain_period(period), "09:00 〜 09:20 有雨")
 
 
 if __name__ == "__main__":
