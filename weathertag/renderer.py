@@ -202,7 +202,7 @@ class WeatherRenderer:
         draw = ImageDraw.Draw(image)
 
         self._header(draw, rendered_at, battery_millivolts)
-        draw.line(LAYOUT.header_rule, fill=BLACK, width=1)
+        draw.line(LAYOUT.header_rule, fill=BLACK, width=2)
         draw.line(LAYOUT.main_rule, fill=BLACK, width=1)
 
         self._current(draw, snapshot)
