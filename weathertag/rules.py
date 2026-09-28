@@ -44,7 +44,7 @@ def build_reminders(
 
     changes = temperature_change_text(snapshot, config, yesterday)
     if changes:
-        reminders.append(Reminder(ReminderKind.TEMPERATURE_CHANGE, "|".join(changes), True))
+        reminders.append(Reminder(ReminderKind.TEMPERATURE_CHANGE, "，".join(changes), True))
 
     if today.uv_index is not None and today.uv_index >= config.uv_reminder_index and snapshot.current.observed_at.hour < 18:
         reminders.append(Reminder(ReminderKind.UV, f"紫外线{today.uv_index}，外出注意防晒", True))
@@ -61,12 +61,12 @@ def temperature_change_text(
     today = snapshot.daily[0]
     parts: list[str] = []
     if yesterday is not None and (today.day - yesterday.day).days == 1:
-        change = _daily_change("今比昨", yesterday, today, config)
+        change = _daily_change("今日", yesterday, today, config)
         if change:
             parts.append(change)
     tomorrow = next((day for day in snapshot.daily if (day.day - today.day).days == 1), None)
     if tomorrow is not None:
-        change = _daily_change("明比今", today, tomorrow, config)
+        change = _daily_change("明日", today, tomorrow, config)
         if change:
             parts.append(change)
     return tuple(parts)
@@ -75,11 +75,14 @@ def temperature_change_text(
 def _daily_change(label: str, before: DailyForecast, after: DailyForecast, config: RuleConfig) -> str:
     maximum = after.max_temperature - before.max_temperature
     minimum = after.min_temperature - before.min_temperature
-    if max(abs(maximum), abs(minimum)) < config.daily_temperature_change_c:
+    significant = [value for value in (maximum, minimum) if abs(value) >= config.daily_temperature_change_c]
+    if not significant:
         return ""
-    def show(value: int) -> str:
-        return f"{'↑' if value > 0 else '↓' if value < 0 else '→'}{abs(value)}°"
-    return f"{label} 高{show(maximum)} 低{show(minimum)}"
+    if all(value > 0 for value in significant):
+        return f"{label}大幅升温"
+    if all(value < 0 for value in significant):
+        return f"{label}大幅降温"
+    return f"{label}气温波动大"
 
 
 def is_currently_raining(snapshot: WeatherSnapshot, config: RuleConfig) -> bool:
@@ -192,6 +195,8 @@ def has_material_change(
     previous_kinds = {item.kind for item in build_reminders(previous, config, yesterday)}
     current_kinds = {item.kind for item in build_reminders(current, config, yesterday)}
     if previous_kinds != current_kinds:
+        return True
+    if temperature_change_text(previous, config, yesterday) != temperature_change_text(current, config, yesterday):
         return True
     if icon_category(previous.current.icon) != icon_category(current.current.icon):
         return True

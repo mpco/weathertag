@@ -123,7 +123,7 @@ LAYOUT = ScreenLayout(
     forecast_temperature_font=17,  # 三日高低温字号。
     forecast_row_y=(56, 121, 175),  # 今天、明天、后天三行的中线 y 坐标。
     forecast_rule_y=(94, 148),  # 三日预报两条水平分隔线的 y 坐标。
-    today_detail_position=(392, 77),  # 今日风力/湿度的右中对齐位置。
+    today_detail_position=(392, 83),  # 今日风力/湿度的右中对齐位置。
     today_detail_anchor="rm",  # 今日风力/湿度的 Pillow 文字锚点。
     today_detail_font=14,  # 今日风力/湿度/紫外线字号。
     today_detail_max_width=181,  # 今日风力/湿度最大宽度。
@@ -134,7 +134,7 @@ LAYOUT = ScreenLayout(
     chart_bottom=187,  # 小型降水柱状图基线。
     chart_label_y=189,  # 降水图固定文字“此刻 → 降雨信息 → 2小时”的顶部 y 坐标。
     chart_label_font=12,  # 降水图时间标签字号，界面最小字号。
-    reminder_top_rule=(8, 205, 392, 205),  # 底部三行提醒区上方分割线。
+    reminder_top_rule=(8, 211, 392, 211),  # 底部三行提醒区上方分割线。
 )
 
 
@@ -445,18 +445,17 @@ class WeatherRenderer:
         if not visible:
             return
         draw.line(LAYOUT.reminder_top_rule, fill=BLACK, width=2)
-        font = self.font(20)
+        top = LAYOUT.reminder_top_rule[1] + 8
+        row_height = (298 - top) / len(visible)
+        preferred_size = 26 if len(visible) == 1 else 23 if len(visible) == 2 else 20
         for index, item in enumerate(visible):
-            y = 224 + index * 29
+            y = round(top + row_height * (index + 0.5))
             fill = RED if item.use_red else BLACK
+            font_size = preferred_size
+            while font_size > 18 and draw.textlength(item.text, font=self.font(font_size)) > 358:
+                font_size -= 1
+            font = self.font(font_size)
             draw_text(draw, (10, y), "•", font=font, fill=fill, anchor="lm")
-            if item.kind == ReminderKind.TEMPERATURE_CHANGE:
-                halves = item.text.split("|", 1)
-                if len(halves) == 2:
-                    change_font = self.font(17)
-                    for x, message in ((31, halves[0]), (210, halves[1])):
-                        draw_text(draw, (x, y), fit_text(draw, message, change_font, 173), font=change_font, fill=fill, anchor="lm")
-                    continue
             message = fit_text(draw, item.text, font, 358)
             draw_text(draw, (31, y), message, font=font, fill=fill, anchor="lm")
 

@@ -74,7 +74,7 @@ class ReminderRulesTest(unittest.TestCase):
         weather = replace(base, daily=(replace(base.daily[0], uv_index=7), tomorrow, base.daily[2]))
 
         self.assertEqual(temperature_change_text(weather, self.rules, yesterday), (
-            "今比昨 高↓6° 低↓6°", "明比今 高↑7° 低↓6°",
+            "今日大幅降温", "明日气温波动大",
         ))
         kinds = {item.kind for item in build_reminders(weather, self.rules, yesterday)}
         self.assertIn(ReminderKind.TEMPERATURE_CHANGE, kinds)
@@ -87,6 +87,18 @@ class ReminderRulesTest(unittest.TestCase):
                             max_temperature=36, min_temperature=28)
         self.assertEqual(temperature_change_text(base, self.rules, yesterday), ())
         self.assertEqual(temperature_change_text(base, self.rules), ())
+
+    def test_warming_summary_uses_direction_without_degrees(self) -> None:
+        base = snapshot()
+        tomorrow = replace(base.daily[1], max_temperature=39, min_temperature=30)
+        weather = replace(base, daily=(base.daily[0], tomorrow, base.daily[2]))
+        self.assertEqual(temperature_change_text(weather, self.rules), ("明日大幅升温",))
+
+    def test_change_from_cooling_to_warming_refreshes_screen(self) -> None:
+        base = snapshot()
+        cooler = replace(base, daily=(base.daily[0], replace(base.daily[1], max_temperature=25), base.daily[2]))
+        warmer = replace(base, daily=(base.daily[0], replace(base.daily[1], max_temperature=39), base.daily[2]))
+        self.assertTrue(has_material_change(cooler, warmer, self.rules))
 
     def test_night_icons_keep_their_night_category(self) -> None:
         self.assertEqual(icon_category("150"), "clear_night")
