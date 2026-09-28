@@ -125,7 +125,7 @@ LAYOUT = ScreenLayout(
     forecast_rule_y=(94, 148),  # 三日预报两条水平分隔线的 y 坐标。
     today_detail_position=(392, 77),  # 今日风力/湿度的右中对齐位置。
     today_detail_anchor="rm",  # 今日风力/湿度的 Pillow 文字锚点。
-    today_detail_font=13,  # 今日风力/湿度/紫外线字号。
+    today_detail_font=14,  # 今日风力/湿度/紫外线字号。
     today_detail_max_width=181,  # 今日风力/湿度最大宽度。
     current_accent_bar=(201, 41, 204, 92),  # “今”行左侧红色强调条边界。
     chart_left=10,  # 当前天气区降水趋势图左边界。
@@ -406,7 +406,7 @@ class WeatherRenderer:
         maximum = max(max(values), rules.rain_threshold_mm)
         chart_left, chart_right = LAYOUT.chart_left, LAYOUT.chart_right
         bottom, top = LAYOUT.chart_bottom, LAYOUT.chart_top
-        draw.line((chart_left, bottom, chart_right, bottom), fill=BLACK, width=1)
+        draw.line((chart_left, bottom, chart_right, bottom), fill=BLACK, width=2)
         width = max(2, (chart_right - chart_left) // len(values) - 1)
         for index, value in enumerate(values):
             height = 0 if value <= 0 else max(2, round((value / maximum) * (bottom - top)))
@@ -444,8 +444,8 @@ class WeatherRenderer:
         visible.extend(others[2:2 + (3 - len(visible))])
         if not visible:
             return
-        draw.line(LAYOUT.reminder_top_rule, fill=BLACK, width=1)
-        font = self.font(20 if len(visible) == 1 else 18)
+        draw.line(LAYOUT.reminder_top_rule, fill=BLACK, width=2)
+        font = self.font(20)
         for index, item in enumerate(visible):
             y = 224 + index * 29
             fill = RED if item.use_red else BLACK
@@ -453,7 +453,7 @@ class WeatherRenderer:
             if item.kind == ReminderKind.TEMPERATURE_CHANGE:
                 halves = item.text.split("|", 1)
                 if len(halves) == 2:
-                    change_font = self.font(16)
+                    change_font = self.font(17)
                     for x, message in ((31, halves[0]), (210, halves[1])):
                         draw_text(draw, (x, y), fit_text(draw, message, change_font, 173), font=change_font, fill=fill, anchor="lm")
                     continue
