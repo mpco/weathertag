@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from dataclasses import replace
+from datetime import timedelta
 from pathlib import Path
 
 from PIL import Image, ImageDraw
 
 from weathertag.config import DEFAULT_FONT_PATH, RenderConfig, RuleConfig
-from weathertag.models import RuntimeState, WeatherSnapshot
+from weathertag.models import HourlyForecast, RuntimeState, WeatherSnapshot
 from weathertag.renderer import (
     BLACK,
     LAYOUT,
@@ -21,7 +23,7 @@ from weathertag.renderer import (
 from weathertag.rules import build_reminder, upcoming_rain_period
 from weathertag.state import StateStore
 
-from .helpers import snapshot
+from .helpers import NOW, snapshot
 
 
 class ModelsAndRendererTest(unittest.TestCase):
@@ -61,6 +63,25 @@ class ModelsAndRendererTest(unittest.TestCase):
         period = upcoming_rain_period(weather, rules)
         self.assertIsNotNone(period)
         self.assertEqual(precipitation_detail(weather, period, rules), "雨 · 峰值0.1mm")
+
+    def test_hourly_rain_fallback_is_visible_in_chart(self) -> None:
+        weather = replace(snapshot(), minutely=(), hourly=(
+            HourlyForecast(NOW + timedelta(minutes=30), 28, "305", "小雨", 80, 0.4),
+            HourlyForecast(NOW + timedelta(minutes=90), 28, "101", "多云", 0, 0),
+        ))
+        rules = RuleConfig()
+        image = WeatherRenderer(RenderConfig(font_path=DEFAULT_FONT_PATH)).render(
+            weather, build_reminder(weather, rules), rules,
+        )
+        self.assertTrue(any(image.getpixel((x, y)) == RED for y in range(173, 187) for x in range(50, 145)))
+
+    def test_current_rain_is_marked_when_forecast_chart_is_dry(self) -> None:
+        weather = replace(snapshot(current_precip=0.2), minutely=(), hourly=())
+        rules = RuleConfig()
+        image = WeatherRenderer(RenderConfig(font_path=DEFAULT_FONT_PATH)).render(
+            weather, build_reminder(weather, rules), rules,
+        )
+        self.assertEqual(image.getpixel((10, 176)), RED)
 
     def test_battery_voltage_survives_state_round_trip(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -6,7 +6,7 @@ from weathertag.config import RuleConfig
 from dataclasses import replace
 from datetime import timedelta
 
-from weathertag.models import ReminderKind, WeatherAlert
+from weathertag.models import HourlyForecast, ReminderKind, WeatherAlert
 from weathertag.rules import (
     build_reminder,
     build_reminders,
@@ -126,6 +126,19 @@ class ReminderRulesTest(unittest.TestCase):
 
         self.assertIsNotNone(period)
         self.assertEqual(format_rain_period(period), "09:00 〜 09:20 有雨")
+
+    def test_dry_minutely_forecast_takes_precedence_over_hourly_rain(self) -> None:
+        weather = snapshot()
+        weather = replace(weather, hourly=(
+            HourlyForecast(NOW + timedelta(minutes=30), 28, "305", "小雨", 80, 0.4),
+            HourlyForecast(NOW + timedelta(minutes=90), 28, "101", "多云", 0, 0),
+        ))
+        self.assertIsNone(upcoming_rain_period(weather, self.rules))
+        self.assertEqual(build_reminder(weather, self.rules).kind, ReminderKind.NORMAL)
+
+        without_minutes = replace(weather, minutely=())
+        self.assertEqual(format_rain_period(upcoming_rain_period(without_minutes, self.rules)),
+                         "09:00 〜 10:00 有雨")
 
 
 if __name__ == "__main__":

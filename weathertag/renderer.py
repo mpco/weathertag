@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
 from .config import RenderConfig, RuleConfig
 from .models import Reminder, ReminderKind, WeatherSnapshot
-from .rules import icon_category
+from .rules import icon_category, is_currently_raining, upcoming_rain_period
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -412,6 +412,23 @@ class WeatherRenderer:
             height = 0 if value <= 0 else max(2, round((value / maximum) * (bottom - top)))
             x = chart_left + index * (chart_right - chart_left) / len(values)
             draw.rectangle((round(x), bottom - height, round(x) + width, bottom), fill=color)
+        if not has_rain and is_currently_raining(snapshot, rules):
+            draw.rectangle((chart_left, top + 2, chart_left + 3, bottom - 1), fill=RED)
+        if not snapshot.minutely:
+            period = upcoming_rain_period(snapshot, rules)
+            if period is not None:
+                window_start = snapshot.current.observed_at
+                window_end = window_start + timedelta(hours=2)
+                start = max(period[0], window_start)
+                end = min(period[1], window_end)
+                if end > start:
+                    chart_width = chart_right - chart_left
+                    left = chart_left + round((start - window_start).total_seconds() / 7200 * chart_width)
+                    right = chart_left + round((end - window_start).total_seconds() / 7200 * chart_width)
+                    right = max(left + 2, right)
+                    draw.rectangle((left, top, right, bottom - 1), outline=RED, width=1)
+                    for x in range(left + 3, right - 1, 7):
+                        draw.line((x, top + 2, min(x + 4, right - 1), bottom - 3), fill=RED, width=1)
         draw_text(
             draw,
             (chart_left, LAYOUT.chart_label_y),

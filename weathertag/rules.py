@@ -118,6 +118,11 @@ def upcoming_rain_period(
     if period is not None:
         return period
 
+    # A dry minutely forecast is still a forecast. Do not override it with
+    # coarser hourly rain data; hourly is only for a missing minutely series.
+    if snapshot.minutely:
+        return None
+
     # Minutely precipitation is limited to China. Hourly data is a conservative
     # fallback for installations where that endpoint returns no points.
     cutoff = snapshot.current.observed_at + timedelta(minutes=120)
