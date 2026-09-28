@@ -75,6 +75,8 @@ class RuleConfig:
     temperature_gap_c: int = 10
     significant_temperature_change_c: int = 2
     hourly_rain_probability: int = 50
+    daily_temperature_change_c: int = 5
+    uv_reminder_index: int = 6
 
 
 @dataclass(frozen=True, slots=True)

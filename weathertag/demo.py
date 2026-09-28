@@ -32,27 +32,28 @@ def demo_snapshot(scenario: str = "normal", now: datetime | None = None) -> Weat
     daily = tuple(
         DailyForecast(
             day=(now + timedelta(days=index)).date(),
-            min_temperature=24 - index,
-            max_temperature=32 - index,
+            min_temperature=(24, 18, 20)[index] if scenario == "multi" else 24 - index,
+            max_temperature=(32, 39, 30)[index] if scenario == "multi" else 32 - index,
             icon_day=icons[index],
             text_day=texts[index],
             wind_direction="东南风",
             wind_scale="3",
             humidity=60 + index * 5,
+            uv_index=7 if index == 0 and scenario == "multi" else 3,
         )
         for index in range(3)
     )
     minutely = tuple(
         MinutePrecipitation(
             forecast_at=now + timedelta(minutes=index * 5),
-            precipitation=(0.04 + index * 0.015) if (rain or scenario == "upcoming") and index >= (0 if rain else 6) else 0,
+            precipitation=(0.04 + index * 0.015) if (rain or scenario in {"upcoming", "multi"}) and index >= (0 if rain else 6) else 0,
             kind="rain",
         )
         for index in range(24)
     )
     alerts = (
         WeatherAlert("demo-alert", "暴雨红色", "extreme", "alert", now),
-    ) if scenario == "warning" else ()
+    ) if scenario in {"warning", "multi"} else ()
     return WeatherSnapshot(
         fetched_at=now,
         api_updated_at=now,

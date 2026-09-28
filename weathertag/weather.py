@@ -178,6 +178,7 @@ def parse_snapshot(
                 wind_direction=str(item["windDirDay"]),
                 wind_scale=str(item["windScaleDay"]),
                 humidity=int(item["humidity"]),
+                uv_index=int(item["uvIndex"]) if item.get("uvIndex") not in (None, "") else None,
             )
             for item in daily_raw["daily"][:3]
         )

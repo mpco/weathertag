@@ -89,6 +89,27 @@ class ServiceTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(service.state.battery_millivolts, 2987)
             self.assertEqual(StateStore(config.state_path).load().battery_millivolts, 2987)
 
+    async def test_yesterday_forecast_is_saved_after_date_rollover(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = AppConfig(
+                render=RenderConfig(font_path=DEFAULT_FONT_PATH),
+                output_path=root / "latest.png",
+                state_path=root / "state.json",
+            )
+            first = snapshot(maximum=38, minimum=30)
+            second = snapshot(maximum=32, minimum=24)
+            second = replace(second, daily=tuple(
+                replace(day, day=day.day + timedelta(days=1)) for day in second.daily
+            ))
+            service = WeatherTagService(
+                config, FakeWeather([first, second]), WeatherRenderer(config.render),
+                FakeDisplay(), FakeNotifier(), StateStore(config.state_path),
+            )
+            self.assertTrue(await service.run_once(now=NOW))
+            self.assertTrue(await service.run_once(now=NOW + timedelta(days=1)))
+            self.assertEqual(StateStore(config.state_path).load().yesterday_forecast, first.daily[0])
+
     async def test_failure_screen_and_notification_are_rate_limited(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -45,6 +45,8 @@ cold_temperature_c = 5 # 当前或日最低温不高于此摄氏度时触发寒�
 temperature_gap_c = 10 # 日最高与最低温差达到此值时触发昼夜温差提醒。
 significant_temperature_change_c = 2 # 当前温度较上次数据变化达到此值时立即刷屏。
 hourly_rain_probability = 50 # 缺少分钟降水数据时，小时降水概率达到此百分比则作为降雨兜底。
+daily_temperature_change_c = 5 # 相邻两天的最高或最低温变化达到此值时提醒。
+uv_reminder_index = 6 # 当日最大紫外线指数达到此值时提醒防晒。
 
 [render] # 电子价签画布和字体参数。
 width = 400 # 画布宽度像素；当前硬件协议要求保持 400。

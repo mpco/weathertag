@@ -5,7 +5,7 @@ import asyncio
 import logging
 import signal
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from .config import DEFAULT_FONT_PATH, ConfigError, RenderConfig, load_config
@@ -13,7 +13,7 @@ from .demo import demo_snapshot
 from .epd import BleEPDDisplay, DisabledDisplay, scan_devices
 from .notifier import Notifier
 from .renderer import WeatherRenderer
-from .rules import build_reminder
+from .rules import build_reminders
 from .service import WeatherTagService
 from .state import StateStore
 from .weather import JWTProvider, QWeatherClient
@@ -26,7 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
     demo = sub.add_parser("render-demo", help="渲染无需 API 或硬件的示例图片")
     demo.add_argument(
         "--scenario",
-        choices=("normal", "night", "upcoming", "rain", "warning", "failure"),
+        choices=("normal", "night", "upcoming", "rain", "warning", "multi", "failure"),
         default="normal",
     )
     demo.add_argument("--output", type=Path, default=Path("var/demo.png"))
@@ -74,11 +74,25 @@ def _render_demo(args: argparse.Namespace) -> int:
     else:
         snapshot = demo_snapshot(args.scenario, now)
         from .config import RuleConfig
+        from .models import DailyForecast
 
         rules = RuleConfig()
+        yesterday = None
+        if args.scenario == "multi":
+            today = snapshot.daily[0]
+            yesterday = DailyForecast(
+                day=today.day - timedelta(days=1),
+                min_temperature=30,
+                max_temperature=38,
+                icon_day="100",
+                text_day="晴",
+                wind_direction="东南风",
+                wind_scale="3",
+                humidity=55,
+            )
         image = renderer.render(
             snapshot,
-            build_reminder(snapshot, rules),
+            build_reminders(snapshot, rules, yesterday),
             rules,
             rendered_at=now,
             battery_millivolts=args.battery_millivolts,

@@ -68,6 +68,13 @@ class ModelsAndRendererTest(unittest.TestCase):
             store.save(RuntimeState(battery_millivolts=2987))
             self.assertEqual(store.load().battery_millivolts, 2987)
 
+    def test_yesterday_forecast_survives_state_round_trip(self) -> None:
+        yesterday = snapshot().daily[0]
+        with tempfile.TemporaryDirectory() as directory:
+            store = StateStore(Path(directory) / "state.json")
+            store.save(RuntimeState(yesterday_forecast=yesterday))
+            self.assertEqual(store.load().yesterday_forecast, yesterday)
+
     def test_battery_icon_is_filled_from_voltage(self) -> None:
         renderer = WeatherRenderer(RenderConfig(font_path=DEFAULT_FONT_PATH))
         image = Image.new("RGB", (400, 30), WHITE)

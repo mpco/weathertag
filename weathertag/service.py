@@ -10,7 +10,7 @@ from .epd import Display
 from .models import RuntimeState, WeatherSnapshot
 from .notifier import Notifier
 from .renderer import WeatherRenderer
-from .rules import build_reminder, has_material_change
+from .rules import build_reminders, has_material_change
 from .state import StateStore
 
 LOGGER = logging.getLogger(__name__)
@@ -47,17 +47,23 @@ class WeatherTagService:
             await self._weather_failure(now, exc)
             return False
 
+        if previous is not None and (snapshot.daily[0].day - previous.daily[0].day).days == 1:
+            self.state.yesterday_forecast = previous.daily[0]
+        yesterday = self.state.yesterday_forecast
+        if yesterday is not None and (snapshot.daily[0].day - yesterday.day).days != 1:
+            yesterday = None
+            self.state.yesterday_forecast = None
         self.state.last_snapshot = snapshot
         restored_from_failure = self.state.last_failure_screen is not None
         self.state.last_failure_screen = None
-        material = has_material_change(previous, snapshot, self.config.rules)
+        material = has_material_change(previous, snapshot, self.config.rules, yesterday)
         scheduled = self._scheduled_refresh_due(now)
         should_refresh = force or restored_from_failure or material or scheduled
 
-        reminder = build_reminder(snapshot, self.config.rules)
+        reminders = build_reminders(snapshot, self.config.rules, yesterday)
         image = self.renderer.render(
             snapshot,
-            reminder,
+            reminders,
             self.config.rules,
             rendered_at=now,
             battery_millivolts=self.state.battery_millivolts,
@@ -67,7 +73,7 @@ class WeatherTagService:
             "天气更新成功: %s %d℃，提醒=%s，刷屏=%s",
             snapshot.current.text,
             snapshot.current.temperature,
-            reminder.kind,
+            ",".join(item.kind for item in reminders),
             should_refresh,
         )
         if should_refresh:

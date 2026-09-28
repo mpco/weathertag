@@ -8,6 +8,8 @@ from typing import Any
 
 class ReminderKind(StrEnum):
     NORMAL = "normal"
+    TEMPERATURE_CHANGE = "temperature_change"
+    UV = "uv"
     TEMPERATURE_GAP = "temperature_gap"
     EXTREME_TEMPERATURE = "extreme_temperature"
     UPCOMING_RAIN = "upcoming_rain"
@@ -39,6 +41,7 @@ class DailyForecast:
     wind_direction: str
     wind_scale: str
     humidity: int
+    uv_index: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +132,7 @@ class Reminder:
 @dataclass(slots=True)
 class RuntimeState:
     last_snapshot: WeatherSnapshot | None = None
+    yesterday_forecast: DailyForecast | None = None
     last_screen_update: datetime | None = None
     last_failure_screen: datetime | None = None
     battery_millivolts: int | None = None

@@ -26,7 +26,7 @@ class WeatherParsingTest(unittest.TestCase):
         }
         daily_item = {
             "fxDate": NOW.date().isoformat(), "tempMin": "24", "tempMax": "32", "iconDay": "101",
-            "textDay": "多云", "windDirDay": "东南风", "windScaleDay": "3", "humidity": "60",
+            "textDay": "多云", "windDirDay": "东南风", "windScaleDay": "3", "humidity": "60", "uvIndex": "7",
         }
         hourly_item = {
             "fxTime": NOW.isoformat(), "temp": "28", "icon": "101", "text": "多云",
@@ -47,6 +47,7 @@ class WeatherParsingTest(unittest.TestCase):
         )
         self.assertEqual(result.current.temperature, 28)
         self.assertEqual(len(result.daily), 3)
+        self.assertEqual(result.daily[0].uv_index, 7)
         self.assertEqual(result.alerts[0].title, "大风")
         self.assertEqual(result.minutely[0].precipitation, 0.1)
 

@@ -8,8 +8,8 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from .config import RenderConfig, RuleConfig
-from .models import Reminder, WeatherSnapshot
-from .rules import format_rain_period, icon_category, upcoming_rain_period
+from .models import Reminder, ReminderKind, WeatherSnapshot
+from .rules import icon_category
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -77,22 +77,13 @@ class ScreenLayout:
     today_detail_font: int
     today_detail_max_width: int
     current_accent_bar: tuple[int, int, int, int]
-    precipitation_summary_position: tuple[int, int]
-    precipitation_summary_font: int
-    precipitation_summary_max_width: int
-    precipitation_detail_position: tuple[int, int]
-    precipitation_detail_font: int
-    precipitation_detail_max_width: int
     chart_left: int
     chart_right: int
     chart_top: int
     chart_bottom: int
     chart_label_y: int
     chart_label_font: int
-    reminder_box: tuple[int, int, int, int]
-    reminder_position: tuple[int, int]
-    reminder_font: int
-    reminder_max_width: int
+    reminder_top_rule: tuple[int, int, int, int]
 
 
 # 手动微调入口：修改这里后运行 `weathertag render-demo` 生成预览。
@@ -118,7 +109,7 @@ LAYOUT = ScreenLayout(
     current_temperature_font=58,  # 当前温度数字字号。
     current_unit_position=(142, 57),  # 当前温度单位的左上位置。
     current_unit_font=24,  # 当前温度单位字号。
-    current_summary_position=(102, 157),  # 天气文字与体感温度的中心位置。
+    current_summary_position=(102, 141),  # 天气文字与体感温度的中心位置。
     current_summary_font=22,  # 天气文字与体感温度字号。
     current_summary_max_width=184,  # 天气文字与体感温度最大宽度。
     forecast_label_x=211,  # “今/明/后”标签的左边 x 坐标。
@@ -134,25 +125,16 @@ LAYOUT = ScreenLayout(
     forecast_rule_y=(94, 148),  # 三日预报两条水平分隔线的 y 坐标。
     today_detail_position=(392, 77),  # 今日风力/湿度的右中对齐位置。
     today_detail_anchor="rm",  # 今日风力/湿度的 Pillow 文字锚点。
-    today_detail_font=14,  # 今日风力/湿度字号。
+    today_detail_font=13,  # 今日风力/湿度/紫外线字号。
     today_detail_max_width=181,  # 今日风力/湿度最大宽度。
     current_accent_bar=(201, 41, 204, 92),  # “今”行左侧红色强调条边界。
-    precipitation_summary_position=(96, 216),  # 左侧降水摘要的居中位置。
-    precipitation_summary_font=14,  # 两小时降水摘要字号。
-    precipitation_summary_max_width=176,  # 降水时段文字最大宽度。
-    precipitation_detail_position=(96, 239),  # 降水类型和峰值的居中位置。
-    precipitation_detail_font=12,  # 降水详情字号。
-    precipitation_detail_max_width=176,  # 降水详情文字最大宽度。
-    chart_left=190,  # 降水柱状图左边界。
-    chart_right=391,  # 降水柱状图右边界。
-    chart_top=209,  # 降水柱状图最高点。
-    chart_bottom=243,  # 降水柱状图基线。
-    chart_label_y=245,  # 降水图“现在/2小时”标签顶部 y 坐标。
+    chart_left=10,  # 当前天气区降水趋势图左边界。
+    chart_right=188,  # 当前天气区降水趋势图右边界。
+    chart_top=173,  # 小型降水柱状图最高点。
+    chart_bottom=187,  # 小型降水柱状图基线。
+    chart_label_y=189,  # 降水图固定文字“此刻 → 降雨信息 → 2小时”的顶部 y 坐标。
     chart_label_font=12,  # 降水图时间标签字号，界面最小字号。
-    reminder_box=(8, 258, 392, 293),  # 底部提醒框边界。
-    reminder_position=(200, 275),  # 底部提醒文字中心位置。
-    reminder_font=20,  # 底部提醒文字字号。
-    reminder_max_width=346,  # 底部提醒文字最大宽度。
+    reminder_top_rule=(8, 205, 392, 205),  # 底部三行提醒区上方分割线。
 )
 
 
@@ -209,7 +191,7 @@ class WeatherRenderer:
     def render(
         self,
         snapshot: WeatherSnapshot,
-        reminder: Reminder,
+        reminder: Reminder | tuple[Reminder, ...],
         rules: RuleConfig,
         *,
         rendered_at: datetime | None = None,
@@ -224,9 +206,9 @@ class WeatherRenderer:
         draw.line(LAYOUT.main_rule, fill=BLACK, width=1)
 
         self._current(draw, snapshot)
-        self._forecast(draw, snapshot)
+        self._forecast(draw, snapshot, rules)
         self._precipitation(draw, snapshot, rules)
-        self._reminder(draw, reminder)
+        self._reminder(draw, reminder if isinstance(reminder, tuple) else (reminder,))
         return image
 
     def render_failure(
@@ -342,7 +324,7 @@ class WeatherRenderer:
             anchor="mm",
         )
 
-    def _forecast(self, draw: ImageDraw.ImageDraw, snapshot: WeatherSnapshot) -> None:
+    def _forecast(self, draw: ImageDraw.ImageDraw, snapshot: WeatherSnapshot, rules: RuleConfig) -> None:
         labels = ("今", "明", "后")
         for index, day in enumerate(snapshot.daily[:3]):
             y = LAYOUT.forecast_row_y[index]
@@ -382,20 +364,29 @@ class WeatherRenderer:
                 anchor="rm",
             )
 
-        today_detail = (
-            f"{snapshot.current.wind_direction}{snapshot.current.wind_scale}级"
-            f" · 湿度{snapshot.current.humidity}%"
-        )
+        today_detail = f"{snapshot.current.wind_direction}{snapshot.current.wind_scale}级 湿度{snapshot.current.humidity}%"
         today_detail_font = self.font(LAYOUT.today_detail_font)
+        detail_x, detail_y = LAYOUT.today_detail_position
+        detail_width = LAYOUT.today_detail_max_width
+        uv = snapshot.daily[0].uv_index
+        if uv is not None:
+            uv_text = f"UV{uv}级"
+            draw_text(
+                draw, LAYOUT.today_detail_position, uv_text, font=today_detail_font,
+                fill=RED if uv >= rules.uv_reminder_index else BLACK, anchor=LAYOUT.today_detail_anchor,
+            )
+            uv_width = round(draw.textlength(uv_text, font=today_detail_font))
+            detail_x -= uv_width + 5
+            detail_width -= uv_width + 5
         today_detail = fit_text(
             draw,
             today_detail,
             today_detail_font,
-            LAYOUT.today_detail_max_width,
+            detail_width,
         )
         draw_text(
             draw,
-            LAYOUT.today_detail_position,
+            (detail_x, detail_y),
             today_detail,
             font=today_detail_font,
             fill=BLACK,
@@ -407,42 +398,8 @@ class WeatherRenderer:
             draw.rectangle(LAYOUT.current_accent_bar, fill=RED)
 
     def _precipitation(self, draw: ImageDraw.ImageDraw, snapshot: WeatherSnapshot, rules: RuleConfig) -> None:
-        rain_period = upcoming_rain_period(snapshot, rules)
         has_rain = any(item.precipitation >= rules.rain_threshold_mm for item in snapshot.minutely)
         color = RED if has_rain else BLACK
-        if rain_period is None:
-            summary = "未来2小时无明显降雨"
-            detail = ""
-        else:
-            summary = format_rain_period(rain_period)
-            detail = precipitation_detail(snapshot, rain_period, rules)
-        summary_font = self.font(LAYOUT.precipitation_summary_font)
-        if detail:
-            summary_position = LAYOUT.precipitation_summary_position
-        else:
-            summary_position = (
-                LAYOUT.precipitation_summary_position[0],
-                (LAYOUT.precipitation_summary_position[1] + LAYOUT.precipitation_detail_position[1]) // 2,
-            )
-        draw_text(
-            draw,
-            summary_position,
-            fit_text(draw, summary, summary_font, LAYOUT.precipitation_summary_max_width),
-            font=summary_font,
-            fill=color,
-            anchor="mm",
-        )
-        if detail:
-            detail_font = self.font(LAYOUT.precipitation_detail_font)
-            draw_text(
-                draw,
-                LAYOUT.precipitation_detail_position,
-                fit_text(draw, detail, detail_font, LAYOUT.precipitation_detail_max_width),
-                font=detail_font,
-                fill=color,
-                anchor="mm",
-            )
-
         values = [item.precipitation for item in snapshot.minutely[:24]]
         if not values:
             values = [0.0] * 24
@@ -458,10 +415,17 @@ class WeatherRenderer:
         draw_text(
             draw,
             (chart_left, LAYOUT.chart_label_y),
-            "现在",
+            "此刻",
             font=self.small_font(LAYOUT.chart_label_font),
             fill=BLACK,
         )
+        label_font = self.small_font(LAYOUT.chart_label_font)
+        draw_text(draw, (42, LAYOUT.chart_label_y), "→", font=label_font, fill=BLACK)
+        draw_text(
+            draw, (96, LAYOUT.chart_label_y), "降雨信息",
+            font=label_font, fill=BLACK, anchor="ma",
+        )
+        draw_text(draw, (138, LAYOUT.chart_label_y), "→", font=label_font, fill=BLACK)
         draw_text(
             draw,
             (chart_right, LAYOUT.chart_label_y),
@@ -471,21 +435,30 @@ class WeatherRenderer:
             anchor="ra",
         )
 
-    def _reminder(self, draw: ImageDraw.ImageDraw, reminder: Reminder) -> None:
-        color = RED if reminder.use_red else BLACK
-        draw.rounded_rectangle(LAYOUT.reminder_box, radius=7, outline=color, width=2)
-        if reminder.use_red:
-            draw.rectangle((8, 265, 13, 286), fill=RED)
-        reminder_font = self.font(LAYOUT.reminder_font)
-        message = fit_text(draw, reminder.text, reminder_font, LAYOUT.reminder_max_width)
-        draw_text(
-            draw,
-            LAYOUT.reminder_position,
-            message,
-            font=reminder_font,
-            fill=color,
-            anchor="mm",
-        )
+    def _reminder(self, draw: ImageDraw.ImageDraw, reminders: tuple[Reminder, ...]) -> None:
+        change = next((item for item in reminders if item.kind == ReminderKind.TEMPERATURE_CHANGE), None)
+        others = [item for item in reminders if item.kind != ReminderKind.TEMPERATURE_CHANGE]
+        visible = others[:2]
+        if change is not None:
+            visible.append(change)
+        visible.extend(others[2:2 + (3 - len(visible))])
+        if not visible:
+            return
+        draw.line(LAYOUT.reminder_top_rule, fill=BLACK, width=1)
+        font = self.font(20 if len(visible) == 1 else 18)
+        for index, item in enumerate(visible):
+            y = 224 + index * 29
+            fill = RED if item.use_red else BLACK
+            draw_text(draw, (10, y), "•", font=font, fill=fill, anchor="lm")
+            if item.kind == ReminderKind.TEMPERATURE_CHANGE:
+                halves = item.text.split("|", 1)
+                if len(halves) == 2:
+                    change_font = self.font(16)
+                    for x, message in ((31, halves[0]), (210, halves[1])):
+                        draw_text(draw, (x, y), fit_text(draw, message, change_font, 173), font=change_font, fill=fill, anchor="lm")
+                    continue
+            message = fit_text(draw, item.text, font, 358)
+            draw_text(draw, (31, y), message, font=font, fill=fill, anchor="lm")
 
 
 def draw_text(

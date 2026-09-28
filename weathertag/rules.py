@@ -5,36 +5,81 @@ from datetime import datetime, timedelta
 from typing import TypeVar
 
 from .config import RuleConfig
-from .models import HourlyForecast, MinutePrecipitation, Reminder, ReminderKind, WeatherSnapshot
+from .models import DailyForecast, HourlyForecast, MinutePrecipitation, Reminder, ReminderKind, WeatherSnapshot
 
 
 _SEVERITY = {"unknown": 0, "minor": 1, "moderate": 2, "severe": 3, "extreme": 4}
 
 
 def build_reminder(snapshot: WeatherSnapshot, config: RuleConfig) -> Reminder:
+    return build_reminders(snapshot, config)[0]
+
+
+def build_reminders(
+    snapshot: WeatherSnapshot,
+    config: RuleConfig,
+    yesterday: DailyForecast | None = None,
+) -> tuple[Reminder, ...]:
+    reminders: list[Reminder] = []
     if snapshot.alerts:
         alert = max(snapshot.alerts, key=lambda item: _SEVERITY.get(item.severity, 0))
-        return Reminder(ReminderKind.ALERT, f"{alert.title}预警，注意出行安全", True)
+        reminders.append(Reminder(ReminderKind.ALERT, f"{alert.title}预警，注意出行安全", True))
 
     if is_currently_raining(snapshot, config):
-        return Reminder(ReminderKind.RAINING, "正在下雨，建议带伞", True)
-
-    rain_period = upcoming_rain_period(snapshot, config)
-    if rain_period is not None:
-        return Reminder(
-            ReminderKind.UPCOMING_RAIN,
-            f"{format_rain_period(rain_period)}，建议带伞",
-            True,
-        )
+        reminders.append(Reminder(ReminderKind.RAINING, "正在下雨，建议带伞", True))
+    else:
+        rain_period = upcoming_rain_period(snapshot, config)
+        if rain_period is not None:
+            reminders.append(Reminder(
+                ReminderKind.UPCOMING_RAIN,
+                f"{format_rain_period(rain_period)}，建议带伞",
+                True,
+            ))
 
     today = snapshot.daily[0]
     if today.max_temperature >= config.high_temperature_c:
-        return Reminder(ReminderKind.EXTREME_TEMPERATURE, "今日高温，注意防晒", True)
-    if min(today.min_temperature, snapshot.current.temperature) <= config.cold_temperature_c:
-        return Reminder(ReminderKind.EXTREME_TEMPERATURE, "天气寒冷，注意添衣", True)
+        reminders.append(Reminder(ReminderKind.EXTREME_TEMPERATURE, "今日高温，注意防暑", True))
+    elif min(today.min_temperature, snapshot.current.temperature) <= config.cold_temperature_c:
+        reminders.append(Reminder(ReminderKind.EXTREME_TEMPERATURE, "天气寒冷，注意添衣", True))
+
+    changes = temperature_change_text(snapshot, config, yesterday)
+    if changes:
+        reminders.append(Reminder(ReminderKind.TEMPERATURE_CHANGE, "|".join(changes), True))
+
+    if today.uv_index is not None and today.uv_index >= config.uv_reminder_index and snapshot.current.observed_at.hour < 18:
+        reminders.append(Reminder(ReminderKind.UV, f"紫外线{today.uv_index}，外出注意防晒", True))
     if today.max_temperature - today.min_temperature >= config.temperature_gap_c:
-        return Reminder(ReminderKind.TEMPERATURE_GAP, "昼夜温差较大，注意增减衣物", False)
-    return Reminder(ReminderKind.NORMAL, "天气良好，适宜出行", False)
+        reminders.append(Reminder(ReminderKind.TEMPERATURE_GAP, "昼夜温差较大，注意增减衣物", False))
+    return tuple(reminders) or (Reminder(ReminderKind.NORMAL, "天气良好，适宜出行", False),)
+
+
+def temperature_change_text(
+    snapshot: WeatherSnapshot,
+    config: RuleConfig,
+    yesterday: DailyForecast | None = None,
+) -> tuple[str, ...]:
+    today = snapshot.daily[0]
+    parts: list[str] = []
+    if yesterday is not None and (today.day - yesterday.day).days == 1:
+        change = _daily_change("今比昨", yesterday, today, config)
+        if change:
+            parts.append(change)
+    tomorrow = next((day for day in snapshot.daily if (day.day - today.day).days == 1), None)
+    if tomorrow is not None:
+        change = _daily_change("明比今", today, tomorrow, config)
+        if change:
+            parts.append(change)
+    return tuple(parts)
+
+
+def _daily_change(label: str, before: DailyForecast, after: DailyForecast, config: RuleConfig) -> str:
+    maximum = after.max_temperature - before.max_temperature
+    minimum = after.min_temperature - before.min_temperature
+    if max(abs(maximum), abs(minimum)) < config.daily_temperature_change_c:
+        return ""
+    def show(value: int) -> str:
+        return f"{'↑' if value > 0 else '↓' if value < 0 else '→'}{abs(value)}°"
+    return f"{label} 高{show(maximum)} 低{show(minimum)}"
 
 
 def is_currently_raining(snapshot: WeatherSnapshot, config: RuleConfig) -> bool:
@@ -132,14 +177,21 @@ def has_material_change(
     previous: WeatherSnapshot | None,
     current: WeatherSnapshot,
     config: RuleConfig,
+    yesterday: DailyForecast | None = None,
 ) -> bool:
     if previous is None:
+        return True
+    if previous.daily[0].day != current.daily[0].day:
         return True
     if {item.alert_id for item in previous.alerts} != {item.alert_id for item in current.alerts}:
         return True
     if is_currently_raining(previous, config) != is_currently_raining(current, config):
         return True
     if build_reminder(previous, config).kind != build_reminder(current, config).kind:
+        return True
+    previous_kinds = {item.kind for item in build_reminders(previous, config, yesterday)}
+    current_kinds = {item.kind for item in build_reminders(current, config, yesterday)}
+    if previous_kinds != current_kinds:
         return True
     if icon_category(previous.current.icon) != icon_category(current.current.icon):
         return True
